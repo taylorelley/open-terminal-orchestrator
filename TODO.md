@@ -1,0 +1,186 @@
+# ShellGuard — TODO
+
+Project completeness assessment against [PRD.md](./PRD.md).
+
+**Legend:** `[x]` = done, `[-]` = partial, `[ ]` = not started
+**Priority:** P0 = critical/blocking, P1 = high, P2 = medium, P3 = low
+
+---
+
+## Overall Status
+
+| Area | Completion | Notes |
+|------|-----------|-------|
+| Frontend UI (Section 8) | ~95% | All pages, components, routing implemented |
+| Database Schema (Section 10) | 100% | All tables, RLS, indexes in place |
+| Backend Orchestrator (Section 5) | 0% | No FastAPI service exists |
+| API Proxy (Section 9.1) | 0% | No Open Terminal proxy |
+| Management API (Section 9.2) | 0% | No admin API endpoints |
+| Policy Engine (Section 7) | 0% | UI only, no enforcement |
+| Sandbox Lifecycle (Section 6) | 0% | Schema only, no automation |
+| Integrations (Section 12) | 0% | UI config only, no backend |
+| Deployment (Section 13) | 0% | No Docker/K3s manifests |
+
+---
+
+## 1. Backend Orchestrator — P0 (PRD Section 5)
+
+- [ ] Scaffold FastAPI Python project structure
+- [ ] Set up PostgreSQL connection (reuse existing Supabase schema)
+- [ ] Implement health check endpoint (`GET /health`)
+- [ ] Serve frontend SPA static files at `/admin`
+- [ ] Configure CORS and middleware
+- [ ] Add structured logging (JSON format)
+
+## 2. API Proxy — P0 (PRD Section 9.1)
+
+- [ ] `POST /api/execute` — proxy to sandbox Open Terminal, provision if needed
+- [ ] `GET /api/files` — list files in sandbox
+- [ ] `GET /api/files/{path}` — read file from sandbox
+- [ ] `PUT /api/files/{path}` — write file to sandbox
+- [ ] `DELETE /api/files/{path}` — delete file in sandbox
+- [ ] `POST /api/files/upload` — upload file to sandbox
+- [ ] `GET /api/files/download/{path}` — download file from sandbox
+- [ ] `GET /api/search` — search files in sandbox
+- [ ] Extract user identity from `X-Open-WebUI-User-Id` header
+- [ ] Handle sandbox-not-ready states (HTTP 202 + `Retry-After`)
+- [ ] Support `Authorization: Bearer <api-key>` as alternative auth
+
+## 3. Sandbox Pool Manager — P0 (PRD Section 6)
+
+- [ ] Integrate with `openshell` CLI for sandbox create/resume/suspend/destroy
+- [ ] Implement state machine (POOL → WARMING → READY → ACTIVE → SUSPENDED → DESTROYED)
+- [ ] Pre-warmed pool maintenance (create sandboxes to maintain `pool.warmup_size`)
+- [ ] Sandbox assignment on first user request
+- [ ] User data volume mounting (`/data/{user_id}`)
+- [ ] Idle timeout detection (ACTIVE/READY → SUSPENDED after `lifecycle.idle_timeout`)
+- [ ] Suspension expiry (SUSPENDED → DESTROYED after `lifecycle.suspend_timeout`)
+- [ ] Startup timeout enforcement (`lifecycle.startup_timeout`)
+- [ ] Resume timeout enforcement (`lifecycle.resume_timeout`)
+- [ ] Periodic cleanup loop (background task)
+- [ ] Respect `pool.max_sandboxes` and `pool.max_active` limits
+- [ ] Health checks / readiness probes for sandbox containers
+
+## 4. Policy Engine — P0 (PRD Section 7)
+
+- [ ] YAML validation against OpenShell policy schema
+- [ ] Policy resolution: user → group → role → system default (priority cascade)
+- [ ] Apply policy at sandbox creation via `openshell policy set`
+- [ ] Hot-reload dynamic policy sections (network, inference) on running sandboxes
+- [ ] Schedule sandbox recreation for static policy changes (filesystem, process)
+- [ ] Dry-run / validate policy against OpenShell without applying
+- [ ] Policy diff view between versions (backend support)
+
+## 5. Audit Logger — P1 (PRD Section 5.2, 8.7)
+
+- [ ] Automatic logging of policy enforcement events (allow/deny/route)
+- [ ] Automatic logging of sandbox lifecycle events (created/assigned/suspended/resumed/destroyed)
+- [ ] Automatic logging of admin actions (policy changes, config changes, manual operations)
+- [ ] Structured metadata capture (user, sandbox, source IP, request details)
+- [ ] Query API for management UI (`GET /admin/api/audit`)
+- [ ] Export endpoints (CSV, JSON, JSONL)
+- [ ] Retention policy enforcement (default 90 days)
+
+## 6. Management API — P1 (PRD Section 9.2)
+
+### Sandboxes
+- [ ] `GET /admin/api/sandboxes` — list all sandboxes
+- [ ] `GET /admin/api/sandboxes/{id}` — sandbox detail
+- [ ] `POST /admin/api/sandboxes/{id}/suspend` — suspend sandbox
+- [ ] `POST /admin/api/sandboxes/{id}/resume` — resume sandbox
+- [ ] `DELETE /admin/api/sandboxes/{id}` — destroy sandbox
+- [ ] `POST /admin/api/sandboxes/{id}/policy` — update sandbox policy
+- [ ] `GET /admin/api/sandboxes/{id}/logs` — sandbox enforcement logs
+- [ ] `GET /admin/api/pool` — pool status
+- [ ] `PUT /admin/api/pool` — update pool config
+
+### Policies
+- [ ] `GET /admin/api/policies` — list policies
+- [ ] `POST /admin/api/policies` — create policy
+- [ ] `GET /admin/api/policies/{id}` — get policy detail
+- [ ] `PUT /admin/api/policies/{id}` — update policy (creates new version)
+- [ ] `DELETE /admin/api/policies/{id}` — delete policy
+- [ ] `GET /admin/api/policies/{id}/versions` — version history
+- [ ] `POST /admin/api/policies/{id}/validate` — dry-run validation
+- [ ] `GET /admin/api/policies/assignments` — list all assignments
+- [ ] `PUT /admin/api/policies/assignments` — update assignments
+
+### Users & Groups
+- [ ] `POST /admin/api/users/sync` — sync users from Open WebUI
+- [ ] `GET /admin/api/users` — list users
+- [ ] `GET /admin/api/groups` — list groups
+- [ ] `POST /admin/api/groups` — create group
+- [ ] `PUT /admin/api/groups/{id}` — update group
+- [ ] `DELETE /admin/api/groups/{id}` — delete group
+
+### System
+- [ ] `GET /admin/api/health` — detailed health status
+- [ ] `GET /admin/api/metrics` — Prometheus-format metrics
+- [ ] `GET /admin/api/config` — system configuration
+- [ ] `PUT /admin/api/config` — update configuration
+- [ ] `POST /admin/api/backup` — trigger database backup
+
+## 7. Authentication & Authorization — P1 (PRD Section 12.1)
+
+- [ ] Admin authentication for management API (local credentials)
+- [ ] OIDC/OAuth2 SSO integration (Authentik, Keycloak)
+- [ ] API key management for programmatic access
+- [ ] Open WebUI `X-Open-WebUI-User-Id` header validation on proxy API
+
+## 8. Frontend Enhancements — P2 (PRD Section 8)
+
+- [-] YAML editor schema validation (UI exists, no backend validation endpoint)
+- [-] Policy diff view between versions (UI exists, needs backend diff data)
+- [ ] Real-time streaming mode for audit log (Supabase realtime partially wired)
+- [ ] Saved filter presets for audit log
+- [ ] Threshold alerts configuration in monitoring
+- [ ] Terminal embed in sandbox detail panel (operator debugging)
+- [ ] Drag-and-drop policy assignment
+- [ ] Bulk actions on sandbox table (suspend/destroy selected)
+- [ ] Historical trend selector for monitoring charts (1h, 24h, 7d, 30d)
+
+## 9. BYOC Sandbox Image — P1 (PRD Section 5.3)
+
+- [ ] Create `shellguard-sandbox/Dockerfile` (slim variant from `open-terminal:slim`)
+- [ ] Add health check (`curl -sf http://localhost:8000/health`)
+- [ ] Create `shellguard-sandbox/Dockerfile.full` (full variant from `open-terminal:latest`)
+- [ ] Register image with OpenShell as local BYOC source
+- [ ] Document image customization for additional tooling
+
+## 10. Integrations — P2 (PRD Section 12)
+
+- [ ] Open WebUI integration (backend proxy mode, user ID extraction)
+- [ ] OpenShell CLI integration (`openshell sandbox create/suspend/resume/destroy`)
+- [ ] OpenShell policy management (`openshell policy set/get`)
+- [ ] LiteLLM Proxy inference routing (intercept and redirect model API calls)
+- [ ] Prometheus metrics export endpoint
+- [ ] Webhook notifications for lifecycle events
+- [ ] Syslog/SIEM forwarding for audit events
+
+## 11. Deployment — P2 (PRD Section 13)
+
+- [ ] `docker-compose.yml` — reference deployment (orchestrator + PostgreSQL + frontend)
+- [ ] `Dockerfile` — ShellGuard orchestrator container
+- [ ] Kubernetes/K3s manifests for production deployment
+- [ ] Environment variable documentation and `.env.example`
+- [ ] Database initialization and migration scripts (for non-Supabase PostgreSQL)
+- [ ] TLS/reverse proxy configuration guide
+
+## 12. Testing — P2
+
+- [ ] Set up test framework (Vitest for frontend, pytest for backend)
+- [ ] Unit tests for policy resolution logic
+- [ ] Unit tests for sandbox state machine transitions
+- [ ] Integration tests for API proxy routing
+- [ ] Integration tests for management API endpoints
+- [ ] End-to-end test: user request → sandbox provision → command execution → response
+- [ ] Frontend component tests for critical UI flows
+
+## 13. Documentation — P3
+
+- [ ] Architecture overview with diagrams
+- [ ] Deployment guide (Docker Compose + K3s)
+- [ ] Policy authoring guide with examples
+- [ ] API reference (OpenAPI/Swagger)
+- [ ] Operator runbook (troubleshooting, backup/restore)
+- [ ] Contributing guide
