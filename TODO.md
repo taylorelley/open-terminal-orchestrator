@@ -13,7 +13,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 |------|-----------|-------|
 | Frontend UI (Section 8) | ~95% | All pages, components, routing implemented |
 | Database Schema (Section 10) | 100% | All tables, RLS, indexes in place |
-| Backend Orchestrator (Section 5) | 0% | No FastAPI service exists |
+| Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 0% | No Open Terminal proxy |
 | Management API (Section 9.2) | 0% | No admin API endpoints |
 | Policy Engine (Section 7) | 0% | UI only, no enforcement |
@@ -25,12 +25,12 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 1. Backend Orchestrator — P0 (PRD Section 5)
 
-- [ ] Scaffold FastAPI Python project structure
-- [ ] Set up PostgreSQL connection (reuse existing Supabase schema)
-- [ ] Implement health check endpoint (`GET /health`)
-- [ ] Serve frontend SPA static files at `/admin`
-- [ ] Configure CORS and middleware
-- [ ] Add structured logging (JSON format)
+- [x] Scaffold FastAPI Python project structure
+- [x] Set up PostgreSQL connection (reuse existing Supabase schema)
+- [x] Implement health check endpoint (`GET /health`)
+- [x] Serve frontend SPA static files at `/admin`
+- [x] Configure CORS and middleware
+- [x] Add structured logging (JSON format)
 
 ## 2. API Proxy — P0 (PRD Section 9.1)
 
