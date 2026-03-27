@@ -8,6 +8,7 @@ This service handles:
 
 import asyncio
 import logging
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ from fastapi import HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models import Sandbox, User
 from app.services import openshell_client
 from app.services.audit_service import log_lifecycle
@@ -68,8 +70,20 @@ async def _find_user_sandbox(user: User, db: AsyncSession) -> Sandbox | None:
     return result.scalar_one_or_none()
 
 
+def _ensure_user_data_dir(user: User) -> str:
+    """Create and return the host-side data directory for a user."""
+    path = os.path.join(settings.user_data_base_dir, str(user.id))
+    os.makedirs(path, mode=0o750, exist_ok=True)
+    return path
+
+
 async def _claim_pool_sandbox(user: User, db: AsyncSession) -> Sandbox | None:
-    """Assign an available pre-warmed pool sandbox to the user."""
+    """Assign an available pre-warmed pool sandbox to the user.
+
+    The pool sandbox is destroyed and recreated with the user's data volume
+    mounted at ``/data`` inside the container.  This ensures persistent user
+    files across sandbox lifecycles.
+    """
     result = await db.execute(
         select(Sandbox)
         .where(Sandbox.user_id.is_(None), Sandbox.state.in_(["POOL", "READY"]))
@@ -82,8 +96,40 @@ async def _claim_pool_sandbox(user: User, db: AsyncSession) -> Sandbox | None:
         return None
 
     now = datetime.now(timezone.utc)
+    user_data_dir = _ensure_user_data_dir(user)
+
+    # Destroy the anonymous pool sandbox so we can recreate it with the
+    # user's data volume mounted.
+    try:
+        await openshell_client.destroy_sandbox(sandbox.name)
+    except openshell_client.OpenShellError:
+        logger.warning(
+            "Failed to destroy pool sandbox %s for re-creation", sandbox.name,
+        )
+        sandbox.state = "DESTROYED"
+        sandbox.destroyed_at = now
+        await db.flush()
+        return None
+
+    try:
+        info = await openshell_client.create_sandbox(
+            name=sandbox.name,
+            image_tag=sandbox.image_tag,
+            user_data_dir=user_data_dir,
+        )
+    except (openshell_client.OpenShellError, asyncio.TimeoutError):
+        logger.exception(
+            "Failed to recreate sandbox %s with user data volume", sandbox.name,
+        )
+        sandbox.state = "DESTROYED"
+        sandbox.destroyed_at = now
+        await db.flush()
+        return None
+
     sandbox.user_id = user.id
     sandbox.state = "ACTIVE"
+    sandbox.internal_ip = info.internal_ip or sandbox.internal_ip
+    sandbox.data_dir = user_data_dir
     sandbox.last_active_at = now
 
     # Resolve and apply the user's policy to this sandbox.
@@ -108,6 +154,7 @@ async def _claim_pool_sandbox(user: User, db: AsyncSession) -> Sandbox | None:
             "pool_sandbox": sandbox.name,
             "owui_id": user.owui_id,
             "policy": policy_name,
+            "data_dir": user_data_dir,
         },
     )
     await db.flush()

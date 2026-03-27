@@ -153,7 +153,12 @@ async def _suspend_idle(db: AsyncSession, cfg: dict) -> None:
 
 
 async def _destroy_expired(db: AsyncSession, cfg: dict) -> None:
-    """Destroy suspended sandboxes that have exceeded ``suspend_timeout``."""
+    """Destroy suspended sandboxes that have exceeded ``suspend_timeout``.
+
+    Note: only the openshell container is destroyed.  The host-side user data
+    directory (``sandbox.data_dir``) is intentionally preserved so that files
+    persist when the user is assigned a new sandbox later.
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=cfg["suspend_timeout"])
 
     result = await db.execute(

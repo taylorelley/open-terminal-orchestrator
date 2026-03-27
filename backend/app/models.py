@@ -82,6 +82,7 @@ class Sandbox(Base):
     policy_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("policies.id", ondelete="SET NULL"), nullable=True)
     internal_ip: Mapped[str] = mapped_column(Text, nullable=False, default="")
     image_tag: Mapped[str] = mapped_column(Text, nullable=False, default="shellguard-sandbox:slim")
+    data_dir: Mapped[str] = mapped_column(Text, nullable=False, default="")
     gpu_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     cpu_usage: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     memory_usage: Mapped[float] = mapped_column(Float, nullable=False, default=0)
