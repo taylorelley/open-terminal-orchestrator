@@ -1,5 +1,6 @@
 """Sandbox management API routes."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -9,6 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import AuditLogEntry, Sandbox, SystemConfig
+from app.services import openshell_client
+
+logger = logging.getLogger(__name__)
 from app.schemas import (
     AuditLogResponse,
     PaginatedResponse,
@@ -70,6 +74,12 @@ async def suspend_sandbox(
     if row.state not in ("ACTIVE", "READY"):
         raise HTTPException(status_code=409, detail=f"Cannot suspend sandbox in state {row.state}")
 
+    try:
+        await openshell_client.suspend_sandbox(row.name)
+    except Exception:
+        logger.exception("openshell suspend failed for %s", row.name)
+        raise HTTPException(status_code=502, detail="Failed to suspend sandbox via openshell")
+
     row.state = "SUSPENDED"
     row.suspended_at = datetime.now(timezone.utc)
     row.cpu_usage = 0
@@ -91,6 +101,13 @@ async def resume_sandbox(
     if row.state != "SUSPENDED":
         raise HTTPException(status_code=409, detail=f"Cannot resume sandbox in state {row.state}")
 
+    try:
+        info = await openshell_client.resume_sandbox(row.name)
+        row.internal_ip = info.internal_ip or row.internal_ip
+    except Exception:
+        logger.exception("openshell resume failed for %s", row.name)
+        raise HTTPException(status_code=502, detail="Failed to resume sandbox via openshell")
+
     row.state = "ACTIVE"
     row.suspended_at = None
     row.last_active_at = datetime.now(timezone.utc)
@@ -109,6 +126,11 @@ async def destroy_sandbox(
         raise HTTPException(status_code=404, detail="Sandbox not found")
     if row.state == "DESTROYED":
         raise HTTPException(status_code=409, detail="Sandbox is already destroyed")
+
+    try:
+        await openshell_client.destroy_sandbox(row.name)
+    except Exception:
+        logger.exception("openshell destroy failed for %s — marking destroyed anyway", row.name)
 
     row.state = "DESTROYED"
     row.destroyed_at = datetime.now(timezone.utc)

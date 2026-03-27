@@ -18,6 +18,7 @@ from app.routes.proxy import router as proxy_router
 from app.routes.sandboxes import router as sandboxes_router
 from app.routes.system import router as system_router
 from app.routes.users import router as users_router
+from app.services.pool_manager import pool_manager
 from app.services.proxy_client import close_client, init_client
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,11 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
         logger.warning("Database is not reachable — running in degraded mode")
 
     await init_client()
+    await pool_manager.start()
 
     yield
 
+    await pool_manager.stop()
     await close_client()
     await engine.dispose()
     logger.info("ShellGuard stopped")

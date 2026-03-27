@@ -6,6 +6,7 @@ This service handles:
 - Finding the user's sandbox and handling state transitions
 """
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AuditLogEntry, Sandbox, User
+from app.services import openshell_client
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +122,44 @@ def _extract_owui_id(request: Request) -> str:
     raise HTTPException(status_code=401, detail="Missing user identity")
 
 
+async def _background_resume(sandbox_name: str, sandbox_id: uuid.UUID) -> None:
+    """Resume a sandbox via openshell in the background.
+
+    On success the sandbox row is updated to ACTIVE with the new IP.
+    On failure it is reverted to SUSPENDED so the next request can retry.
+    """
+    from app.database import async_session as _async_session
+
+    async with _async_session() as db:
+        try:
+            info = await openshell_client.resume_sandbox(sandbox_name)
+
+            sandbox = (
+                await db.execute(select(Sandbox).where(Sandbox.id == sandbox_id))
+            ).scalar_one_or_none()
+            if sandbox is None:
+                return
+
+            sandbox.state = "ACTIVE"
+            sandbox.internal_ip = info.internal_ip or sandbox.internal_ip
+            sandbox.suspended_at = None
+            sandbox.last_active_at = datetime.now(timezone.utc)
+            await db.commit()
+            logger.info("Background resume succeeded for %s", sandbox_name)
+        except Exception:
+            logger.exception("Background resume failed for %s", sandbox_name)
+            # Revert to SUSPENDED so the next request can retry.
+            try:
+                sandbox = (
+                    await db.execute(select(Sandbox).where(Sandbox.id == sandbox_id))
+                ).scalar_one_or_none()
+                if sandbox and sandbox.state == "WARMING":
+                    sandbox.state = "SUSPENDED"
+                await db.commit()
+            except Exception:
+                await db.rollback()
+
+
 async def resolve_sandbox(request: Request, db: AsyncSession) -> ResolvedSandbox:
     """Identify the calling user and return their ready sandbox.
 
@@ -155,6 +195,14 @@ async def resolve_sandbox(request: Request, db: AsyncSession) -> ResolvedSandbox
                 )
             )
             await db.flush()
+
+            # Kick off the actual openshell resume in the background so the
+            # sandbox transitions to READY/ACTIVE on the next request.
+            asyncio.create_task(
+                _background_resume(sandbox.name, sandbox.id),
+                name=f"resume-{sandbox.name}",
+            )
+
             raise HTTPException(
                 status_code=202,
                 detail="Sandbox is resuming",
