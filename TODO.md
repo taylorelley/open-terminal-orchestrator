@@ -15,7 +15,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | Database Schema (Section 10) | 100% | All tables, RLS, indexes in place |
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 0% | No Open Terminal proxy |
-| Management API (Section 9.2) | 0% | No admin API endpoints |
+| Management API (Section 9.2) | ~90% | All CRUD endpoints implemented; backup endpoint pending |
 | Policy Engine (Section 7) | 0% | UI only, no enforcement |
 | Sandbox Lifecycle (Section 6) | 0% | Schema only, no automation |
 | Integrations (Section 12) | 0% | UI config only, no backend |
@@ -84,40 +84,40 @@ Project completeness assessment against [PRD.md](./PRD.md).
 ## 6. Management API — P1 (PRD Section 9.2)
 
 ### Sandboxes
-- [ ] `GET /admin/api/sandboxes` — list all sandboxes
-- [ ] `GET /admin/api/sandboxes/{id}` — sandbox detail
-- [ ] `POST /admin/api/sandboxes/{id}/suspend` — suspend sandbox
-- [ ] `POST /admin/api/sandboxes/{id}/resume` — resume sandbox
-- [ ] `DELETE /admin/api/sandboxes/{id}` — destroy sandbox
-- [ ] `POST /admin/api/sandboxes/{id}/policy` — update sandbox policy
-- [ ] `GET /admin/api/sandboxes/{id}/logs` — sandbox enforcement logs
-- [ ] `GET /admin/api/pool` — pool status
-- [ ] `PUT /admin/api/pool` — update pool config
+- [x] `GET /admin/api/sandboxes` — list all sandboxes
+- [x] `GET /admin/api/sandboxes/{id}` — sandbox detail
+- [x] `POST /admin/api/sandboxes/{id}/suspend` — suspend sandbox
+- [x] `POST /admin/api/sandboxes/{id}/resume` — resume sandbox
+- [x] `DELETE /admin/api/sandboxes/{id}` — destroy sandbox
+- [x] `POST /admin/api/sandboxes/{id}/policy` — update sandbox policy
+- [x] `GET /admin/api/sandboxes/{id}/logs` — sandbox enforcement logs
+- [x] `GET /admin/api/pool` — pool status
+- [x] `PUT /admin/api/pool` — update pool config
 
 ### Policies
-- [ ] `GET /admin/api/policies` — list policies
-- [ ] `POST /admin/api/policies` — create policy
-- [ ] `GET /admin/api/policies/{id}` — get policy detail
-- [ ] `PUT /admin/api/policies/{id}` — update policy (creates new version)
-- [ ] `DELETE /admin/api/policies/{id}` — delete policy
-- [ ] `GET /admin/api/policies/{id}/versions` — version history
-- [ ] `POST /admin/api/policies/{id}/validate` — dry-run validation
-- [ ] `GET /admin/api/policies/assignments` — list all assignments
-- [ ] `PUT /admin/api/policies/assignments` — update assignments
+- [x] `GET /admin/api/policies` — list policies
+- [x] `POST /admin/api/policies` — create policy
+- [x] `GET /admin/api/policies/{id}` — get policy detail
+- [x] `PUT /admin/api/policies/{id}` — update policy (creates new version)
+- [x] `DELETE /admin/api/policies/{id}` — delete policy
+- [x] `GET /admin/api/policies/{id}/versions` — version history
+- [-] `POST /admin/api/policies/{id}/validate` — dry-run validation (placeholder, needs openshell)
+- [x] `GET /admin/api/policies/assignments` — list all assignments
+- [x] `PUT /admin/api/policies/assignments` — update assignments
 
 ### Users & Groups
-- [ ] `POST /admin/api/users/sync` — sync users from Open WebUI
-- [ ] `GET /admin/api/users` — list users
-- [ ] `GET /admin/api/groups` — list groups
-- [ ] `POST /admin/api/groups` — create group
-- [ ] `PUT /admin/api/groups/{id}` — update group
-- [ ] `DELETE /admin/api/groups/{id}` — delete group
+- [-] `POST /admin/api/users/sync` — sync users from Open WebUI (placeholder, needs OWUI API)
+- [x] `GET /admin/api/users` — list users
+- [x] `GET /admin/api/groups` — list groups
+- [x] `POST /admin/api/groups` — create group
+- [x] `PUT /admin/api/groups/{id}` — update group
+- [x] `DELETE /admin/api/groups/{id}` — delete group
 
 ### System
-- [ ] `GET /admin/api/health` — detailed health status
-- [ ] `GET /admin/api/metrics` — Prometheus-format metrics
-- [ ] `GET /admin/api/config` — system configuration
-- [ ] `PUT /admin/api/config` — update configuration
+- [x] `GET /admin/api/health` — detailed health status
+- [-] `GET /admin/api/metrics` — Prometheus-format metrics (placeholder)
+- [x] `GET /admin/api/config` — system configuration
+- [x] `PUT /admin/api/config` — update configuration
 - [ ] `POST /admin/api/backup` — trigger database backup
 
 ## 7. Authentication & Authorization — P1 (PRD Section 12.1)
