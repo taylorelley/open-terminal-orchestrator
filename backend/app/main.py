@@ -14,9 +14,11 @@ from app.logging import setup_logging
 from app.middleware import RequestIDMiddleware, configure_cors
 from app.routes.health import router as health_router
 from app.routes.policies import router as policies_router
+from app.routes.proxy import router as proxy_router
 from app.routes.sandboxes import router as sandboxes_router
 from app.routes.system import router as system_router
 from app.routes.users import router as users_router
+from app.services.proxy_client import close_client, init_client
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +35,11 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     else:
         logger.warning("Database is not reachable — running in degraded mode")
 
+    await init_client()
+
     yield
 
+    await close_client()
     await engine.dispose()
     logger.info("ShellGuard stopped")
 
@@ -53,6 +58,7 @@ configure_cors(app)
 
 # API routes
 app.include_router(health_router)
+app.include_router(proxy_router)
 app.include_router(sandboxes_router)
 app.include_router(policies_router)
 app.include_router(users_router)
