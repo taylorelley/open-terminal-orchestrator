@@ -70,6 +70,26 @@ class PolicyVersionResponse(BaseModel):
     created_at: datetime
 
 
+class PolicyDiffDetail(BaseModel):
+    old: dict | None = None
+    new: dict | None = None
+
+
+class PolicyDiffResponse(BaseModel):
+    from_version: str
+    to_version: str
+    sections_changed: list[str]
+    sections_added: list[str]
+    sections_removed: list[str]
+    has_dynamic_changes: bool
+    has_static_changes: bool
+    dynamic_sections_changed: list[str]
+    static_sections_changed: list[str]
+    metadata_changed: bool
+    details: dict[str, PolicyDiffDetail]
+    unified_diff: str
+
+
 # ---------------------------------------------------------------------------
 # Group
 # ---------------------------------------------------------------------------
@@ -145,6 +165,7 @@ class SandboxResponse(BaseModel):
     last_active_at: datetime
     suspended_at: datetime | None
     destroyed_at: datetime | None
+    pending_recreation: bool = False
     user: UserResponse | None = None
     policy: PolicyResponse | None = None
 

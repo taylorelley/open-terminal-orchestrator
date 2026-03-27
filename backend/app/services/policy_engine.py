@@ -7,6 +7,7 @@ Handles:
 - Applying a resolved policy to a sandbox via the openshell CLI.
 """
 
+import difflib
 import logging
 import tempfile
 import uuid
@@ -132,6 +133,87 @@ def _validate_process(section: Any, errors: list[str]) -> None:
         value = section.get(key)
         if value is not None and not isinstance(value, bool):
             errors.append(f"process.{key} must be a boolean, got {type(value).__name__}")
+
+
+# ---------------------------------------------------------------------------
+# Policy diff and section classification
+# ---------------------------------------------------------------------------
+
+# Sections that can be hot-reloaded on running sandboxes via openshell policy set.
+DYNAMIC_SECTIONS = frozenset({"network", "inference"})
+# Sections that require sandbox recreation to take effect.
+STATIC_SECTIONS = frozenset({"filesystem", "process"})
+
+
+def diff_policy_yaml(old_yaml_str: str, new_yaml_str: str) -> dict[str, Any]:
+    """Compare two policy YAML strings and return a structured diff.
+
+    Returns a dict with keys: sections_changed, sections_added,
+    sections_removed, has_dynamic_changes, has_static_changes,
+    dynamic_sections_changed, static_sections_changed, metadata_changed,
+    details (old/new per changed section), and unified_diff (text).
+    """
+    old_doc = yaml.safe_load(old_yaml_str) or {}
+    new_doc = yaml.safe_load(new_yaml_str) or {}
+
+    all_keys = set(old_doc.keys()) | set(new_doc.keys())
+
+    sections_changed: list[str] = []
+    sections_added: list[str] = []
+    sections_removed: list[str] = []
+    details: dict[str, dict[str, Any]] = {}
+
+    for key in sorted(all_keys):
+        old_val = old_doc.get(key)
+        new_val = new_doc.get(key)
+
+        if old_val == new_val:
+            continue
+
+        if old_val is None:
+            sections_added.append(key)
+        elif new_val is None:
+            sections_removed.append(key)
+        else:
+            sections_changed.append(key)
+
+        details[key] = {"old": old_val, "new": new_val}
+
+    all_changed = set(sections_changed) | set(sections_added) | set(sections_removed)
+    # Sections not classified as static are treated as dynamic by default.
+    non_metadata = all_changed - {"metadata"}
+    dynamic_sections_changed = sorted(s for s in non_metadata if s not in STATIC_SECTIONS)
+    static_sections_changed = sorted(s for s in non_metadata if s in STATIC_SECTIONS)
+
+    # Unified text diff for human-readable display.
+    unified_diff = "\n".join(
+        difflib.unified_diff(
+            old_yaml_str.splitlines(),
+            new_yaml_str.splitlines(),
+            fromfile="old",
+            tofile="new",
+            lineterm="",
+        )
+    )
+
+    return {
+        "sections_changed": sections_changed,
+        "sections_added": sections_added,
+        "sections_removed": sections_removed,
+        "has_dynamic_changes": len(dynamic_sections_changed) > 0,
+        "has_static_changes": len(static_sections_changed) > 0,
+        "dynamic_sections_changed": dynamic_sections_changed,
+        "static_sections_changed": static_sections_changed,
+        "metadata_changed": "metadata" in all_changed,
+        "details": details,
+        "unified_diff": unified_diff,
+    }
+
+
+def classify_policy_changes(old_yaml_str: str, new_yaml_str: str) -> tuple[bool, bool]:
+    """Return ``(has_dynamic_changes, has_static_changes)`` between two YAMLs."""
+    result = diff_policy_yaml(old_yaml_str, new_yaml_str)
+    return result["has_dynamic_changes"], result["has_static_changes"]
 
 
 # ---------------------------------------------------------------------------
@@ -298,3 +380,81 @@ async def apply_policy_to_sandbox(
     finally:
         if tmp_path is not None:
             Path(tmp_path).unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Policy propagation (hot-reload)
+# ---------------------------------------------------------------------------
+
+
+async def propagate_policy_to_sandboxes(
+    policy: Policy,
+    db: AsyncSession,
+    *,
+    source_ip: str = "",
+) -> list[uuid.UUID]:
+    """Apply the updated policy to all ACTIVE/READY sandboxes using it.
+
+    Per-sandbox failures are logged but do not prevent other sandboxes from
+    being updated.  Returns the list of sandbox IDs that were successfully
+    updated.
+    """
+    result = await db.execute(
+        select(Sandbox).where(
+            Sandbox.policy_id == policy.id,
+            Sandbox.state.in_(["ACTIVE", "READY"]),
+        )
+    )
+    sandboxes = list(result.scalars().all())
+
+    updated: list[uuid.UUID] = []
+    for sandbox in sandboxes:
+        try:
+            await apply_policy_to_sandbox(sandbox, policy, db, source_ip=source_ip)
+            updated.append(sandbox.id)
+        except Exception:
+            logger.warning(
+                "Hot-reload failed for sandbox %s — skipping", sandbox.name,
+            )
+
+    if updated:
+        logger.info(
+            "Hot-reloaded policy '%s' on %d/%d sandboxes",
+            policy.name, len(updated), len(sandboxes),
+        )
+
+    return updated
+
+
+# ---------------------------------------------------------------------------
+# Sandbox recreation marking
+# ---------------------------------------------------------------------------
+
+
+async def mark_sandboxes_for_recreation(
+    policy_id: uuid.UUID,
+    db: AsyncSession,
+) -> int:
+    """Set ``pending_recreation=True`` on all non-destroyed sandboxes using this policy.
+
+    Returns the count of sandboxes marked.
+    """
+    result = await db.execute(
+        select(Sandbox).where(
+            Sandbox.policy_id == policy_id,
+            Sandbox.state != "DESTROYED",
+        )
+    )
+    sandboxes = list(result.scalars().all())
+
+    for sandbox in sandboxes:
+        sandbox.pending_recreation = True
+
+    if sandboxes:
+        await db.flush()
+        logger.info(
+            "Marked %d sandbox(es) for recreation due to static policy change (policy_id=%s)",
+            len(sandboxes), policy_id,
+        )
+
+    return len(sandboxes)

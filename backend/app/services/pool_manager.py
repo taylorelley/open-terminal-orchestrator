@@ -224,6 +224,50 @@ async def _health_checks(db: AsyncSession) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Proactive recreation
+# ---------------------------------------------------------------------------
+
+
+async def _recreate_pending(db: AsyncSession, cfg: dict) -> None:
+    """Destroy SUSPENDED sandboxes that are marked for recreation.
+
+    When a policy update includes static section changes (filesystem, process),
+    affected sandboxes are flagged with ``pending_recreation=True``.  Suspended
+    sandboxes can be destroyed proactively here; active ones are handled in
+    ``sandbox_resolver.resolve_sandbox`` on the next user request.
+    """
+    result = await db.execute(
+        select(Sandbox).where(
+            Sandbox.pending_recreation.is_(True),
+            Sandbox.state == "SUSPENDED",
+        )
+    )
+
+    for sandbox in result.scalars().all():
+        logger.info(
+            "Destroying suspended sandbox %s for pending policy recreation",
+            sandbox.name,
+        )
+        try:
+            await openshell_client.destroy_sandbox(sandbox.name)
+        except Exception:
+            logger.exception(
+                "openshell destroy failed for %s — marking destroyed anyway",
+                sandbox.name,
+            )
+
+        sandbox.state = "DESTROYED"
+        sandbox.destroyed_at = datetime.now(timezone.utc)
+        sandbox.pending_recreation = False
+        log_lifecycle(
+            db, "destroyed",
+            sandbox=sandbox,
+            details={"reason": "policy_recreation"},
+        )
+        await db.flush()
+
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
@@ -234,6 +278,7 @@ async def _run_cycle() -> None:
         try:
             cfg = await _load_pool_config(db)
 
+            await _recreate_pending(db, cfg)
             await _enforce_startup_timeout(db, cfg)
             await _destroy_expired(db, cfg)
             await _suspend_idle(db, cfg)
