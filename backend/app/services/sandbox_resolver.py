@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AuditLogEntry, Sandbox, User
 from app.services import openshell_client
+from app.services.policy_engine import apply_policy_to_sandbox, resolve_policy_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,19 @@ async def _claim_pool_sandbox(user: User, db: AsyncSession) -> Sandbox | None:
     sandbox.state = "ACTIVE"
     sandbox.last_active_at = now
 
+    # Resolve and apply the user's policy to this sandbox.
+    policy = await resolve_policy_for_user(user, db)
+    policy_name: str | None = None
+    if policy is not None:
+        try:
+            await apply_policy_to_sandbox(sandbox, policy, db)
+            policy_name = policy.name
+        except Exception:
+            logger.warning(
+                "Policy application failed for sandbox %s — continuing without policy",
+                sandbox.name,
+            )
+
     # Record the assignment in the audit log.
     db.add(
         AuditLogEntry(
@@ -93,7 +107,11 @@ async def _claim_pool_sandbox(user: User, db: AsyncSession) -> Sandbox | None:
             category="lifecycle",
             user_id=user.id,
             sandbox_id=sandbox.id,
-            details={"pool_sandbox": sandbox.name, "owui_id": user.owui_id},
+            details={
+                "pool_sandbox": sandbox.name,
+                "owui_id": user.owui_id,
+                "policy": policy_name,
+            },
             source_ip="",
         )
     )
@@ -177,6 +195,22 @@ async def resolve_sandbox(request: Request, db: AsyncSession) -> ResolvedSandbox
             sandbox.last_active_at = datetime.now(timezone.utc)
             if sandbox.state == "READY":
                 sandbox.state = "ACTIVE"
+
+            # Re-check policy assignment in case it changed since last session.
+            policy = await resolve_policy_for_user(user, db)
+            expected_id = policy.id if policy else None
+            if expected_id != sandbox.policy_id and policy is not None:
+                try:
+                    await apply_policy_to_sandbox(
+                        sandbox, policy, db,
+                        source_ip=request.client.host if request.client else "",
+                    )
+                except Exception:
+                    logger.warning(
+                        "Policy re-application failed for sandbox %s — keeping existing policy",
+                        sandbox.name,
+                    )
+
             await db.flush()
             return ResolvedSandbox(sandbox=sandbox, user=user)
 

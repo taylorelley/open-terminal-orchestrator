@@ -18,6 +18,7 @@ from app.schemas import (
     PolicyUpdate,
     PolicyVersionResponse,
 )
+from app.services.policy_engine import validate_policy_yaml
 
 router = APIRouter(prefix="/admin/api", tags=["policies"])
 
@@ -35,6 +36,11 @@ async def create_policy(
     body: PolicyCreate,
     db: AsyncSession = Depends(get_db),
 ):
+    if body.yaml:
+        valid, errors = validate_policy_yaml(body.yaml)
+        if not valid:
+            raise HTTPException(status_code=422, detail={"errors": errors})
+
     now = datetime.now(timezone.utc)
     policy = Policy(
         name=body.name,
@@ -96,8 +102,11 @@ async def update_policy(
     if body.description is not None:
         row.description = body.description
 
-    # If YAML changed, bump version and create a new PolicyVersion record
+    # If YAML changed, validate, bump version and create a new PolicyVersion record
     if body.yaml is not None and body.yaml != row.yaml:
+        valid, errors = validate_policy_yaml(body.yaml)
+        if not valid:
+            raise HTTPException(status_code=422, detail={"errors": errors})
         row.yaml = body.yaml
         # Simple semver bump: increment patch
         parts = row.current_version.split(".")
@@ -155,13 +164,15 @@ async def validate_policy(
     policy_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    """Placeholder — real validation requires openshell integration."""
+    """Validate the policy YAML against the expected schema."""
     row = (
         await db.execute(select(Policy).where(Policy.id == policy_id))
     ).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Policy not found")
-    return {"valid": True, "message": "Validation placeholder — openshell integration pending"}
+
+    valid, errors = validate_policy_yaml(row.yaml)
+    return {"valid": valid, "errors": errors}
 
 
 # ---------------------------------------------------------------------------
