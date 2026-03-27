@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from app.schemas import (
     PolicyUpdate,
     PolicyVersionResponse,
 )
+from app.services.audit_service import log_admin
 from app.services.policy_engine import validate_policy_yaml
 
 router = APIRouter(prefix="/admin/api", tags=["policies"])
@@ -33,6 +34,7 @@ async def list_policies(db: AsyncSession = Depends(get_db)):
 
 @router.post("/policies", response_model=PolicyResponse, status_code=201)
 async def create_policy(
+    request: Request,
     body: PolicyCreate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -63,6 +65,17 @@ async def create_policy(
         created_at=now,
     )
     db.add(version)
+
+    log_admin(
+        db, "policy_change",
+        details={
+            "action": "created",
+            "policy_id": str(policy.id),
+            "policy_name": body.name,
+        },
+        source_ip=request.client.host if request.client else "",
+    )
+
     await db.flush()
     await db.refresh(policy)
     return policy
@@ -84,6 +97,7 @@ async def get_policy(
 @router.put("/policies/{policy_id}", response_model=PolicyResponse)
 async def update_policy(
     policy_id: uuid.UUID,
+    request: Request,
     body: PolicyUpdate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -124,6 +138,19 @@ async def update_policy(
         db.add(version)
 
     row.updated_at = now
+
+    changes = [k for k in ("name", "tier", "description", "yaml") if getattr(body, k, None) is not None]
+    log_admin(
+        db, "policy_change",
+        details={
+            "action": "updated",
+            "policy_id": str(policy_id),
+            "policy_name": row.name,
+            "changes": changes,
+        },
+        source_ip=request.client.host if request.client else "",
+    )
+
     await db.flush()
     await db.refresh(row)
     return row
@@ -132,6 +159,7 @@ async def update_policy(
 @router.delete("/policies/{policy_id}", status_code=204)
 async def delete_policy(
     policy_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     row = (
@@ -139,6 +167,16 @@ async def delete_policy(
     ).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Policy not found")
+
+    log_admin(
+        db, "policy_change",
+        details={
+            "action": "deleted",
+            "policy_id": str(policy_id),
+            "policy_name": row.name,
+        },
+        source_ip=request.client.host if request.client else "",
+    )
 
     await db.delete(row)
     await db.flush()
@@ -199,6 +237,7 @@ async def list_assignments(
 
 @router.put("/policies/assignments", response_model=PolicyAssignmentResponse)
 async def upsert_assignment(
+    request: Request,
     body: PolicyAssignmentCreate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -213,9 +252,21 @@ async def upsert_assignment(
     ).scalar_one_or_none()
 
     now = datetime.now(timezone.utc)
+    source_ip = request.client.host if request.client else ""
+
     if existing:
         existing.policy_id = body.policy_id
         existing.priority = body.priority
+        log_admin(
+            db, "policy_change",
+            details={
+                "action": "assignment_updated",
+                "entity_type": body.entity_type,
+                "entity_id": body.entity_id,
+                "policy_id": str(body.policy_id),
+            },
+            source_ip=source_ip,
+        )
         await db.flush()
         await db.refresh(existing)
         return existing
@@ -228,6 +279,16 @@ async def upsert_assignment(
         created_at=now,
     )
     db.add(assignment)
+    log_admin(
+        db, "policy_change",
+        details={
+            "action": "assignment_created",
+            "entity_type": body.entity_type,
+            "entity_id": body.entity_id,
+            "policy_id": str(body.policy_id),
+        },
+        source_ip=source_ip,
+    )
     await db.flush()
     await db.refresh(assignment)
     return assignment

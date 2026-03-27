@@ -22,8 +22,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import async_session
-from app.models import AuditLogEntry, Sandbox, SystemConfig
+from app.models import Sandbox, SystemConfig
 from app.services import openshell_client
+from app.services.audit_service import log_lifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -53,28 +54,6 @@ async def _load_pool_config(db: AsyncSession) -> dict:
         "startup_timeout": result.get("startup_timeout", settings.startup_timeout),
         "resume_timeout": result.get("resume_timeout", settings.resume_timeout),
     }
-
-
-# ---------------------------------------------------------------------------
-# Audit helper
-# ---------------------------------------------------------------------------
-
-
-def _audit(
-    event_type: str,
-    sandbox: Sandbox,
-    details: dict | None = None,
-) -> AuditLogEntry:
-    return AuditLogEntry(
-        id=uuid.uuid4(),
-        timestamp=datetime.now(timezone.utc),
-        event_type=event_type,
-        category="lifecycle",
-        user_id=sandbox.user_id,
-        sandbox_id=sandbox.id,
-        details=details or {},
-        source_ip="",
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +101,7 @@ async def _replenish_pool(db: AsyncSession, cfg: dict) -> None:
             last_active_at=now,
         )
         db.add(sandbox)
-        db.add(_audit("creating", sandbox, {"trigger": "pool_replenish"}))
+        log_lifecycle(db, "creating", sandbox=sandbox, details={"trigger": "pool_replenish"})
         await db.flush()
 
         # Issue the openshell create in the background — the periodic loop
@@ -134,15 +113,13 @@ async def _replenish_pool(db: AsyncSession, cfg: dict) -> None:
             )
             sandbox.internal_ip = info.internal_ip
             sandbox.state = "READY"
-            db.add(_audit("ready", sandbox, {"trigger": "pool_replenish"}))
+            log_lifecycle(db, "ready", sandbox=sandbox, details={"trigger": "pool_replenish"})
             logger.info("Sandbox %s is READY (ip=%s)", name, info.internal_ip)
         except Exception:
             logger.exception("Failed to create sandbox %s", name)
             sandbox.state = "DESTROYED"
             sandbox.destroyed_at = datetime.now(timezone.utc)
-            db.add(
-                _audit("create_failed", sandbox, {"trigger": "pool_replenish"})
-            )
+            log_lifecycle(db, "create_failed", sandbox=sandbox, details={"trigger": "pool_replenish"})
 
         await db.flush()
 
@@ -168,7 +145,7 @@ async def _suspend_idle(db: AsyncSession, cfg: dict) -> None:
             sandbox.cpu_usage = 0
             sandbox.memory_usage = 0
             sandbox.network_io = 0
-            db.add(_audit("suspended", sandbox, {"reason": "idle_timeout"}))
+            log_lifecycle(db, "suspended", sandbox=sandbox, details={"reason": "idle_timeout"})
         except Exception:
             logger.exception("Failed to suspend sandbox %s", sandbox.name)
 
@@ -199,7 +176,7 @@ async def _destroy_expired(db: AsyncSession, cfg: dict) -> None:
         sandbox.cpu_usage = 0
         sandbox.memory_usage = 0
         sandbox.network_io = 0
-        db.add(_audit("destroyed", sandbox, {"reason": "suspend_timeout"}))
+        log_lifecycle(db, "destroyed", sandbox=sandbox, details={"reason": "suspend_timeout"})
         await db.flush()
 
 
@@ -223,7 +200,7 @@ async def _enforce_startup_timeout(db: AsyncSession, cfg: dict) -> None:
 
         sandbox.state = "DESTROYED"
         sandbox.destroyed_at = datetime.now(timezone.utc)
-        db.add(_audit("destroyed", sandbox, {"reason": "startup_timeout"}))
+        log_lifecycle(db, "destroyed", sandbox=sandbox, details={"reason": "startup_timeout"})
         await db.flush()
 
 
@@ -237,9 +214,7 @@ async def _health_checks(db: AsyncSession) -> None:
         healthy = await openshell_client.health_check(sandbox.name)
         if not healthy:
             logger.warning("Sandbox %s failed health check", sandbox.name)
-            db.add(
-                _audit("health_check_failed", sandbox, {"ip": sandbox.internal_ip})
-            )
+            log_lifecycle(db, "health_check_failed", sandbox=sandbox, details={"ip": sandbox.internal_ip})
             await db.flush()
 
 

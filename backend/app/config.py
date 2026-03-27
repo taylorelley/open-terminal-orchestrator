@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Pool manager loop interval (seconds)
     cleanup_interval: int = 30
 
+    # Audit retention
+    audit_retention_days: int = 90
+    audit_retention_interval: int = 86400  # 24 hours
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8080

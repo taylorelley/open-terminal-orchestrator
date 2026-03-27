@@ -16,8 +16,9 @@ from fastapi import HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AuditLogEntry, Sandbox, User
+from app.models import Sandbox, User
 from app.services import openshell_client
+from app.services.audit_service import log_lifecycle
 from app.services.policy_engine import apply_policy_to_sandbox, resolve_policy_for_user
 
 logger = logging.getLogger(__name__)
@@ -99,21 +100,15 @@ async def _claim_pool_sandbox(user: User, db: AsyncSession) -> Sandbox | None:
             )
 
     # Record the assignment in the audit log.
-    db.add(
-        AuditLogEntry(
-            id=uuid.uuid4(),
-            timestamp=now,
-            event_type="assigned",
-            category="lifecycle",
-            user_id=user.id,
-            sandbox_id=sandbox.id,
-            details={
-                "pool_sandbox": sandbox.name,
-                "owui_id": user.owui_id,
-                "policy": policy_name,
-            },
-            source_ip="",
-        )
+    log_lifecycle(
+        db, "assigned",
+        user_id=user.id,
+        sandbox_id=sandbox.id,
+        details={
+            "pool_sandbox": sandbox.name,
+            "owui_id": user.owui_id,
+            "policy": policy_name,
+        },
     )
     await db.flush()
     logger.info("Assigned pool sandbox %s to user %s", sandbox.name, user.owui_id)
@@ -216,17 +211,12 @@ async def resolve_sandbox(request: Request, db: AsyncSession) -> ResolvedSandbox
 
         if sandbox.state == "SUSPENDED":
             sandbox.state = "WARMING"
-            db.add(
-                AuditLogEntry(
-                    id=uuid.uuid4(),
-                    timestamp=datetime.now(timezone.utc),
-                    event_type="resumed",
-                    category="lifecycle",
-                    user_id=user.id,
-                    sandbox_id=sandbox.id,
-                    details={"trigger": "proxy_request"},
-                    source_ip=request.client.host if request.client else "",
-                )
+            log_lifecycle(
+                db, "resumed",
+                user_id=user.id,
+                sandbox_id=sandbox.id,
+                details={"trigger": "proxy_request"},
+                source_ip=request.client.host if request.client else "",
             )
             await db.flush()
 

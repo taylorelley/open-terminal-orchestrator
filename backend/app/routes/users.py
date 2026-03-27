@@ -3,13 +3,14 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Group, User
 from app.schemas import GroupCreate, GroupResponse, GroupUpdate, UserResponse
+from app.services.audit_service import log_admin
 
 router = APIRouter(prefix="/admin/api", tags=["users"])
 
@@ -43,6 +44,7 @@ async def list_groups(db: AsyncSession = Depends(get_db)):
 
 @router.post("/groups", response_model=GroupResponse, status_code=201)
 async def create_group(
+    request: Request,
     body: GroupCreate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -55,6 +57,11 @@ async def create_group(
         updated_at=now,
     )
     db.add(group)
+    log_admin(
+        db, "config_change",
+        details={"action": "group_created", "group_name": body.name},
+        source_ip=request.client.host if request.client else "",
+    )
     await db.flush()
     await db.refresh(group)
     return group
@@ -63,6 +70,7 @@ async def create_group(
 @router.put("/groups/{group_id}", response_model=GroupResponse)
 async def update_group(
     group_id: uuid.UUID,
+    request: Request,
     body: GroupUpdate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -80,6 +88,12 @@ async def update_group(
         row.policy_id = body.policy_id
 
     row.updated_at = datetime.now(timezone.utc)
+    changes = [k for k in ("name", "description", "policy_id") if getattr(body, k, None) is not None]
+    log_admin(
+        db, "config_change",
+        details={"action": "group_updated", "group_name": row.name, "group_id": str(group_id), "changes": changes},
+        source_ip=request.client.host if request.client else "",
+    )
     await db.flush()
     await db.refresh(row)
     return row
@@ -88,6 +102,7 @@ async def update_group(
 @router.delete("/groups/{group_id}", status_code=204)
 async def delete_group(
     group_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     row = (
@@ -96,5 +111,10 @@ async def delete_group(
     if not row:
         raise HTTPException(status_code=404, detail="Group not found")
 
+    log_admin(
+        db, "config_change",
+        details={"action": "group_deleted", "group_name": row.name, "group_id": str(group_id)},
+        source_ip=request.client.host if request.client else "",
+    )
     await db.delete(row)
     await db.flush()
