@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     sandbox_port: int = 8000
     proxy_timeout: int = 30
 
+    # User data volumes
+    user_data_base_dir: str = "/var/lib/shellguard/user-data"
+
     # Pool defaults (overridden by system_config rows at runtime)
     pool_warmup_size: int = 2
     pool_max_sandboxes: int = 20

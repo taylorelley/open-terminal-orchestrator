@@ -52,7 +52,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] Implement state machine (POOL → WARMING → READY → ACTIVE → SUSPENDED → DESTROYED)
 - [x] Pre-warmed pool maintenance (create sandboxes to maintain `pool.warmup_size`)
 - [x] Sandbox assignment on first user request
-- [ ] User data volume mounting (`/data/{user_id}`)
+- [x] User data volume mounting (`/data/{user_id}`)
 - [x] Idle timeout detection (ACTIVE/READY → SUSPENDED after `lifecycle.idle_timeout`)
 - [x] Suspension expiry (SUSPENDED → DESTROYED after `lifecycle.suspend_timeout`)
 - [x] Startup timeout enforcement (`lifecycle.startup_timeout`)
