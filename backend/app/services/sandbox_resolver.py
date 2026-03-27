@@ -9,6 +9,7 @@ This service handles:
 import asyncio
 import logging
 import os
+import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -182,6 +183,21 @@ def _extract_owui_id(request: Request) -> str:
     raise HTTPException(status_code=401, detail="Missing user identity")
 
 
+def _validate_proxy_api_key(request: Request) -> None:
+    """Validate the proxy API key if one is configured.
+
+    When ``settings.open_webui_api_key`` is set, proxy requests must include
+    a matching ``X-API-Key`` header.  If the setting is empty, validation
+    is skipped.
+    """
+    if not settings.open_webui_api_key:
+        return
+
+    api_key = request.headers.get("X-API-Key", "")
+    if not api_key or not secrets.compare_digest(api_key, settings.open_webui_api_key):
+        raise HTTPException(status_code=401, detail="Invalid or missing proxy API key")
+
+
 async def _background_resume(sandbox_name: str, sandbox_id: uuid.UUID) -> None:
     """Resume a sandbox via openshell in the background.
 
@@ -269,6 +285,7 @@ async def resolve_sandbox(request: Request, db: AsyncSession) -> ResolvedSandbox
         HTTPException(202) — sandbox is warming / resuming (includes Retry-After).
         HTTPException(503) — no sandbox available in the pool.
     """
+    _validate_proxy_api_key(request)
     owui_id = _extract_owui_id(request)
     user = await _get_or_create_user(owui_id, db)
     sandbox = await _find_user_sandbox(user, db)
@@ -306,6 +323,7 @@ async def resolve_sandbox(request: Request, db: AsyncSession) -> ResolvedSandbox
 
         if sandbox.state == "SUSPENDED":
             sandbox.state = "WARMING"
+            sandbox.warming_started_at = datetime.now(timezone.utc)
             log_lifecycle(
                 db, "resumed",
                 user_id=user.id,

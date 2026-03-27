@@ -10,9 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import Group, User
 from app.schemas import GroupCreate, GroupResponse, GroupUpdate, UserResponse
+from app.services.admin_auth import require_admin
 from app.services.audit_service import log_admin
 
-router = APIRouter(prefix="/admin/api", tags=["users"])
+router = APIRouter(
+    prefix="/admin/api",
+    tags=["users"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 @router.get("/users", response_model=list[UserResponse])

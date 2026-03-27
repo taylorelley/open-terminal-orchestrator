@@ -19,6 +19,7 @@ from app.schemas import (
     PolicyUpdate,
     PolicyVersionResponse,
 )
+from app.services.admin_auth import require_admin
 from app.services.audit_service import log_admin
 from app.services.policy_engine import (
     classify_policy_changes,
@@ -28,7 +29,11 @@ from app.services.policy_engine import (
     validate_policy_yaml,
 )
 
-router = APIRouter(prefix="/admin/api", tags=["policies"])
+router = APIRouter(
+    prefix="/admin/api",
+    tags=["policies"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 @router.get("/policies", response_model=list[PolicyResponse])

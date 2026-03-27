@@ -99,6 +99,7 @@ async def _replenish_pool(db: AsyncSession, cfg: dict) -> None:
             image_tag=settings.default_image_tag,
             created_at=now,
             last_active_at=now,
+            warming_started_at=now,
         )
         db.add(sandbox)
         log_lifecycle(db, "creating", sandbox=sandbox, details={"trigger": "pool_replenish"})
@@ -186,13 +187,19 @@ async def _destroy_expired(db: AsyncSession, cfg: dict) -> None:
 
 
 async def _enforce_startup_timeout(db: AsyncSession, cfg: dict) -> None:
-    """Mark WARMING sandboxes as DESTROYED if they exceed ``startup_timeout``."""
+    """Mark WARMING *pool* sandboxes as DESTROYED if they exceed ``startup_timeout``.
+
+    Only targets unassigned (pool) sandboxes — sandboxes being resumed from
+    SUSPENDED are handled by ``_enforce_resume_timeout`` instead.
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=cfg["startup_timeout"])
 
     result = await db.execute(
         select(Sandbox).where(
             Sandbox.state == "WARMING",
-            Sandbox.created_at < cutoff,
+            Sandbox.user_id.is_(None),
+            Sandbox.warming_started_at.isnot(None),
+            Sandbox.warming_started_at < cutoff,
         )
     )
 
@@ -206,6 +213,42 @@ async def _enforce_startup_timeout(db: AsyncSession, cfg: dict) -> None:
         sandbox.state = "DESTROYED"
         sandbox.destroyed_at = datetime.now(timezone.utc)
         log_lifecycle(db, "destroyed", sandbox=sandbox, details={"reason": "startup_timeout"})
+        await db.flush()
+
+
+async def _enforce_resume_timeout(db: AsyncSession, cfg: dict) -> None:
+    """Revert WARMING user sandboxes to SUSPENDED if resume exceeds ``resume_timeout``.
+
+    When a sandbox is resumed (SUSPENDED → WARMING), a background task runs
+    the openshell resume CLI.  If that task stalls beyond ``resume_timeout``,
+    this function reverts the sandbox to SUSPENDED so the next user request
+    can retry.  This mirrors the failure behaviour of ``_background_resume``.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=cfg["resume_timeout"])
+
+    result = await db.execute(
+        select(Sandbox).where(
+            Sandbox.state == "WARMING",
+            Sandbox.user_id.isnot(None),
+            Sandbox.warming_started_at.isnot(None),
+            Sandbox.warming_started_at < cutoff,
+        )
+    )
+
+    for sandbox in result.scalars().all():
+        logger.warning(
+            "Sandbox %s resume timed out (warming_started_at=%s) — reverting to SUSPENDED",
+            sandbox.name,
+            sandbox.warming_started_at,
+        )
+        sandbox.state = "SUSPENDED"
+        sandbox.suspended_at = datetime.now(timezone.utc)
+        sandbox.warming_started_at = None
+        log_lifecycle(
+            db, "resume_timeout",
+            sandbox=sandbox,
+            details={"reason": "resume_timeout", "timeout_seconds": cfg["resume_timeout"]},
+        )
         await db.flush()
 
 
@@ -280,6 +323,7 @@ async def _run_cycle() -> None:
 
             await _recreate_pending(db, cfg)
             await _enforce_startup_timeout(db, cfg)
+            await _enforce_resume_timeout(db, cfg)
             await _destroy_expired(db, cfg)
             await _suspend_idle(db, cfg)
             await _replenish_pool(db, cfg)

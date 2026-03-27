@@ -6,7 +6,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,9 +19,14 @@ from app.schemas import (
     SystemConfigResponse,
     SystemConfigUpdate,
 )
+from app.services.admin_auth import generate_api_key, list_api_keys, require_admin, revoke_api_key
 from app.services.audit_service import log_admin
 
-router = APIRouter(prefix="/admin/api", tags=["system"])
+router = APIRouter(
+    prefix="/admin/api",
+    tags=["system"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 # ---------------------------------------------------------------------------
@@ -244,3 +249,50 @@ def _export_csv(rows: list[AuditLogEntry]) -> StreamingResponse:
 async def get_metrics():
     """Placeholder — Prometheus-format metrics to be implemented."""
     return {"status": "pending", "message": "Prometheus metrics export not yet implemented"}
+
+
+# ---------------------------------------------------------------------------
+# API Key Management
+# ---------------------------------------------------------------------------
+
+
+@router.post("/auth/keys")
+async def create_api_key(
+    request: Request,
+    label: str = Query("", description="Human-readable label for the key"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a new admin API key.  The raw key is returned only once."""
+    result = await generate_api_key(db, label=label)
+    log_admin(
+        db, "api_key_created",
+        details={"key_id": result["id"], "label": label},
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.commit()
+    return result
+
+
+@router.get("/auth/keys")
+async def get_api_keys(db: AsyncSession = Depends(get_db)):
+    """List all API keys (hashes are not returned)."""
+    return await list_api_keys(db)
+
+
+@router.delete("/auth/keys/{key_id}")
+async def delete_api_key(
+    key_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke an API key by its ID."""
+    removed = await revoke_api_key(db, key_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="API key not found")
+    log_admin(
+        db, "api_key_revoked",
+        details={"key_id": key_id},
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.commit()
+    return {"status": "revoked", "key_id": key_id}
