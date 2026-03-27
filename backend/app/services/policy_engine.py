@@ -18,8 +18,9 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AuditLogEntry, Policy, PolicyAssignment, Sandbox, SystemConfig, User
+from app.models import Policy, PolicyAssignment, Sandbox, SystemConfig, User
 from app.services import openshell_client
+from app.services.audit_service import log_enforcement
 
 logger = logging.getLogger(__name__)
 
@@ -267,21 +268,16 @@ async def apply_policy_to_sandbox(
         await openshell_client.set_policy(sandbox.name, tmp_path)
 
         sandbox.policy_id = policy.id
-        db.add(
-            AuditLogEntry(
-                id=uuid.uuid4(),
-                timestamp=datetime.now(timezone.utc),
-                event_type="policy_applied",
-                category="enforcement",
-                user_id=sandbox.user_id,
-                sandbox_id=sandbox.id,
-                details={
-                    "policy_id": str(policy.id),
-                    "policy_name": policy.name,
-                    "policy_version": policy.current_version,
-                },
-                source_ip=source_ip,
-            )
+        log_enforcement(
+            db, "policy_applied",
+            user_id=sandbox.user_id,
+            sandbox_id=sandbox.id,
+            details={
+                "policy_id": str(policy.id),
+                "policy_name": policy.name,
+                "policy_version": policy.current_version,
+            },
+            source_ip=source_ip,
         )
         await db.flush()
         logger.info(

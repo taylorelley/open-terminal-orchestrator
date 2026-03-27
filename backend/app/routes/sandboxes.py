@@ -4,13 +4,14 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import AuditLogEntry, Policy, Sandbox, SystemConfig
 from app.services import openshell_client
+from app.services.audit_service import log_admin
 from app.services.policy_engine import apply_policy_to_sandbox
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ async def get_sandbox(
 @router.post("/sandboxes/{sandbox_id}/suspend", response_model=SandboxResponse)
 async def suspend_sandbox(
     sandbox_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     row = (await db.execute(select(Sandbox).where(Sandbox.id == sandbox_id))).scalar_one_or_none()
@@ -86,6 +88,11 @@ async def suspend_sandbox(
     row.cpu_usage = 0
     row.memory_usage = 0
     row.network_io = 0
+    log_admin(
+        db, "policy_change",
+        details={"action": "manual_suspend", "sandbox_name": row.name, "sandbox_id": str(sandbox_id)},
+        source_ip=request.client.host if request.client else "",
+    )
     await db.flush()
     await db.refresh(row)
     return row
@@ -94,6 +101,7 @@ async def suspend_sandbox(
 @router.post("/sandboxes/{sandbox_id}/resume", response_model=SandboxResponse)
 async def resume_sandbox(
     sandbox_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     row = (await db.execute(select(Sandbox).where(Sandbox.id == sandbox_id))).scalar_one_or_none()
@@ -112,6 +120,11 @@ async def resume_sandbox(
     row.state = "ACTIVE"
     row.suspended_at = None
     row.last_active_at = datetime.now(timezone.utc)
+    log_admin(
+        db, "policy_change",
+        details={"action": "manual_resume", "sandbox_name": row.name, "sandbox_id": str(sandbox_id)},
+        source_ip=request.client.host if request.client else "",
+    )
     await db.flush()
     await db.refresh(row)
     return row
@@ -120,6 +133,7 @@ async def resume_sandbox(
 @router.delete("/sandboxes/{sandbox_id}", response_model=SandboxResponse)
 async def destroy_sandbox(
     sandbox_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     row = (await db.execute(select(Sandbox).where(Sandbox.id == sandbox_id))).scalar_one_or_none()
@@ -138,6 +152,11 @@ async def destroy_sandbox(
     row.cpu_usage = 0
     row.memory_usage = 0
     row.network_io = 0
+    log_admin(
+        db, "policy_change",
+        details={"action": "manual_destroy", "sandbox_name": row.name, "sandbox_id": str(sandbox_id)},
+        source_ip=request.client.host if request.client else "",
+    )
     await db.flush()
     await db.refresh(row)
     return row
@@ -146,6 +165,7 @@ async def destroy_sandbox(
 @router.post("/sandboxes/{sandbox_id}/policy", response_model=SandboxResponse)
 async def update_sandbox_policy(
     sandbox_id: uuid.UUID,
+    request: Request,
     body: SandboxUpdatePolicy,
     db: AsyncSession = Depends(get_db),
 ):
@@ -166,6 +186,18 @@ async def update_sandbox_policy(
             raise HTTPException(status_code=502, detail="Failed to apply policy via openshell")
     else:
         row.policy_id = body.policy_id
+
+    log_admin(
+        db, "policy_change",
+        details={
+            "action": "sandbox_policy_update",
+            "sandbox_name": row.name,
+            "sandbox_id": str(sandbox_id),
+            "policy_id": str(body.policy_id),
+            "policy_name": policy.name,
+        },
+        source_ip=request.client.host if request.client else "",
+    )
 
     await db.flush()
     await db.refresh(row)
@@ -231,6 +263,7 @@ async def get_pool_status(db: AsyncSession = Depends(get_db)):
 
 @router.put("/pool")
 async def update_pool_config(
+    request: Request,
     body: SystemConfigUpdate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -238,12 +271,19 @@ async def update_pool_config(
         await db.execute(select(SystemConfig).where(SystemConfig.key == "pool"))
     ).scalar_one_or_none()
 
+    old_value = row.value if row else {}
     now = datetime.now(timezone.utc)
     if row:
         row.value = body.value
         row.updated_at = now
     else:
         db.add(SystemConfig(key="pool", value=body.value, updated_at=now))
+
+    log_admin(
+        db, "config_change",
+        details={"setting": "pool", "old_value": old_value, "new_value": body.value},
+        source_ip=request.client.host if request.client else "",
+    )
 
     await db.flush()
     return {"status": "ok"}

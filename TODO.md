@@ -73,13 +73,13 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 5. Audit Logger — P1 (PRD Section 5.2, 8.7)
 
-- [ ] Automatic logging of policy enforcement events (allow/deny/route)
-- [ ] Automatic logging of sandbox lifecycle events (created/assigned/suspended/resumed/destroyed)
-- [ ] Automatic logging of admin actions (policy changes, config changes, manual operations)
-- [ ] Structured metadata capture (user, sandbox, source IP, request details)
-- [ ] Query API for management UI (`GET /admin/api/audit`)
-- [ ] Export endpoints (CSV, JSON, JSONL)
-- [ ] Retention policy enforcement (default 90 days)
+- [x] Automatic logging of policy enforcement events (allow/deny/route)
+- [x] Automatic logging of sandbox lifecycle events (created/assigned/suspended/resumed/destroyed)
+- [x] Automatic logging of admin actions (policy changes, config changes, manual operations)
+- [x] Structured metadata capture (user, sandbox, source IP, request details)
+- [x] Query API for management UI (`GET /admin/api/audit`)
+- [x] Export endpoints (CSV, JSON, JSONL)
+- [x] Retention policy enforcement (default 90 days)
 
 ## 6. Management API — P1 (PRD Section 9.2)
 

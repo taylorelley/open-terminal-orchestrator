@@ -1,9 +1,13 @@
-"""System configuration, audit log, and health API routes."""
+"""System configuration, audit log, health, and export API routes."""
 
+import csv
+import io
+import json
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +19,7 @@ from app.schemas import (
     SystemConfigResponse,
     SystemConfigUpdate,
 )
+from app.services.audit_service import log_admin
 
 router = APIRouter(prefix="/admin/api", tags=["system"])
 
@@ -50,6 +55,7 @@ async def list_config(db: AsyncSession = Depends(get_db)):
 @router.put("/config/{key}", response_model=SystemConfigResponse)
 async def update_config(
     key: str,
+    request: Request,
     body: SystemConfigUpdate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -57,6 +63,7 @@ async def update_config(
         await db.execute(select(SystemConfig).where(SystemConfig.key == key))
     ).scalar_one_or_none()
 
+    old_value = row.value if row else None
     now = datetime.now(timezone.utc)
     if row:
         row.value = body.value
@@ -64,6 +71,12 @@ async def update_config(
     else:
         row = SystemConfig(key=key, value=body.value, updated_at=now)
         db.add(row)
+
+    log_admin(
+        db, "config_change",
+        details={"setting": key, "old_value": old_value, "new_value": body.value},
+        source_ip=request.client.host if request.client else "",
+    )
 
     await db.flush()
     await db.refresh(row)
@@ -73,6 +86,33 @@ async def update_config(
 # ---------------------------------------------------------------------------
 # Audit Log
 # ---------------------------------------------------------------------------
+
+
+def _build_audit_query(
+    category: str | None,
+    event_type: str | None,
+    user_id: uuid.UUID | None,
+    sandbox_id: uuid.UUID | None,
+    since: datetime | None,
+    until: datetime | None,
+):
+    """Build a filtered audit log query (shared between list and export)."""
+    query = select(AuditLogEntry)
+
+    if category:
+        query = query.where(AuditLogEntry.category == category)
+    if event_type:
+        query = query.where(AuditLogEntry.event_type == event_type)
+    if user_id:
+        query = query.where(AuditLogEntry.user_id == user_id)
+    if sandbox_id:
+        query = query.where(AuditLogEntry.sandbox_id == sandbox_id)
+    if since:
+        query = query.where(AuditLogEntry.timestamp >= since)
+    if until:
+        query = query.where(AuditLogEntry.timestamp <= until)
+
+    return query
 
 
 @router.get("/audit", response_model=PaginatedResponse[AuditLogResponse])
@@ -87,34 +127,112 @@ async def list_audit_log(
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(AuditLogEntry)
+    base = _build_audit_query(category, event_type, user_id, sandbox_id, since, until)
     count_query = select(func.count(AuditLogEntry.id))
 
+    # Apply same filters to count query
     if category:
-        query = query.where(AuditLogEntry.category == category)
         count_query = count_query.where(AuditLogEntry.category == category)
     if event_type:
-        query = query.where(AuditLogEntry.event_type == event_type)
         count_query = count_query.where(AuditLogEntry.event_type == event_type)
     if user_id:
-        query = query.where(AuditLogEntry.user_id == user_id)
         count_query = count_query.where(AuditLogEntry.user_id == user_id)
     if sandbox_id:
-        query = query.where(AuditLogEntry.sandbox_id == sandbox_id)
         count_query = count_query.where(AuditLogEntry.sandbox_id == sandbox_id)
     if since:
-        query = query.where(AuditLogEntry.timestamp >= since)
         count_query = count_query.where(AuditLogEntry.timestamp >= since)
     if until:
-        query = query.where(AuditLogEntry.timestamp <= until)
         count_query = count_query.where(AuditLogEntry.timestamp <= until)
 
-    query = query.order_by(AuditLogEntry.timestamp.desc()).offset(offset).limit(limit)
+    query = base.order_by(AuditLogEntry.timestamp.desc()).offset(offset).limit(limit)
 
     total = (await db.execute(count_query)).scalar_one()
     rows = (await db.execute(query)).scalars().all()
 
     return PaginatedResponse(items=rows, total=total, offset=offset, limit=limit)
+
+
+# ---------------------------------------------------------------------------
+# Audit Export
+# ---------------------------------------------------------------------------
+
+_EXPORT_LIMIT = 10_000
+
+
+@router.get("/audit/export")
+async def export_audit_log(
+    format: str = Query("json", description="Export format: csv, json, or jsonl"),
+    category: str | None = Query(None),
+    event_type: str | None = Query(None),
+    user_id: uuid.UUID | None = Query(None),
+    sandbox_id: uuid.UUID | None = Query(None),
+    since: datetime | None = Query(None, description="ISO 8601 timestamp"),
+    until: datetime | None = Query(None, description="ISO 8601 timestamp"),
+    db: AsyncSession = Depends(get_db),
+):
+    query = _build_audit_query(category, event_type, user_id, sandbox_id, since, until)
+    query = query.order_by(AuditLogEntry.timestamp.desc()).limit(_EXPORT_LIMIT)
+
+    rows = (await db.execute(query)).scalars().all()
+
+    if format == "csv":
+        return _export_csv(rows)
+    if format == "jsonl":
+        return _export_jsonl(rows)
+    return _export_json(rows)
+
+
+def _row_to_dict(entry: AuditLogEntry) -> dict:
+    return {
+        "id": str(entry.id),
+        "timestamp": entry.timestamp.isoformat(),
+        "event_type": entry.event_type,
+        "category": entry.category,
+        "user_id": str(entry.user_id) if entry.user_id else None,
+        "sandbox_id": str(entry.sandbox_id) if entry.sandbox_id else None,
+        "details": entry.details,
+        "source_ip": entry.source_ip,
+    }
+
+
+def _export_json(rows: list[AuditLogEntry]) -> StreamingResponse:
+    data = json.dumps([_row_to_dict(r) for r in rows], indent=2)
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=audit_log.json"},
+    )
+
+
+def _export_jsonl(rows: list[AuditLogEntry]) -> StreamingResponse:
+    lines = "\n".join(json.dumps(_row_to_dict(r)) for r in rows)
+    return StreamingResponse(
+        iter([lines]),
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": "attachment; filename=audit_log.jsonl"},
+    )
+
+
+def _export_csv(rows: list[AuditLogEntry]) -> StreamingResponse:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["timestamp", "event_type", "category", "user_id", "sandbox_id", "details", "source_ip"])
+    for entry in rows:
+        writer.writerow([
+            entry.timestamp.isoformat(),
+            entry.event_type,
+            entry.category,
+            str(entry.user_id) if entry.user_id else "",
+            str(entry.sandbox_id) if entry.sandbox_id else "",
+            json.dumps(entry.details),
+            entry.source_ip,
+        ])
+
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=audit_log.csv"},
+    )
 
 
 # ---------------------------------------------------------------------------

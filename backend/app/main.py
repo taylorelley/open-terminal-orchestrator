@@ -18,6 +18,7 @@ from app.routes.proxy import router as proxy_router
 from app.routes.sandboxes import router as sandboxes_router
 from app.routes.system import router as system_router
 from app.routes.users import router as users_router
+from app.services.audit_service import audit_retention_manager
 from app.services.pool_manager import pool_manager
 from app.services.proxy_client import close_client, init_client
 
@@ -38,9 +39,11 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
 
     await init_client()
     await pool_manager.start()
+    await audit_retention_manager.start()
 
     yield
 
+    await audit_retention_manager.stop()
     await pool_manager.stop()
     await close_client()
     await engine.dispose()
