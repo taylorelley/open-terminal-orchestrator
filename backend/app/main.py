@@ -13,6 +13,10 @@ from app.database import check_db_connection, engine
 from app.logging import setup_logging
 from app.middleware import RequestIDMiddleware, configure_cors
 from app.routes.health import router as health_router
+from app.routes.policies import router as policies_router
+from app.routes.sandboxes import router as sandboxes_router
+from app.routes.system import router as system_router
+from app.routes.users import router as users_router
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +53,10 @@ configure_cors(app)
 
 # API routes
 app.include_router(health_router)
+app.include_router(sandboxes_router)
+app.include_router(policies_router)
+app.include_router(users_router)
+app.include_router(system_router)
 
 # Serve the frontend SPA at /admin if the build output exists.
 _dist = Path(settings.frontend_dist_path)
