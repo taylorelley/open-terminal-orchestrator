@@ -91,6 +91,7 @@ class Sandbox(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_active_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    warming_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     destroyed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     pending_recreation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import AuditLogEntry, Policy, Sandbox, SystemConfig
 from app.services import openshell_client
+from app.services.admin_auth import require_admin
 from app.services.audit_service import log_admin
 from app.services.policy_engine import apply_policy_to_sandbox
 
@@ -24,7 +25,11 @@ from app.schemas import (
     SystemConfigUpdate,
 )
 
-router = APIRouter(prefix="/admin/api", tags=["sandboxes"])
+router = APIRouter(
+    prefix="/admin/api",
+    tags=["sandboxes"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 @router.get("/sandboxes", response_model=PaginatedResponse[SandboxResponse])

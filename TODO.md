@@ -17,7 +17,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
 | Management API (Section 9.2) | ~90% | All CRUD endpoints implemented; backup endpoint pending |
 | Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff all implemented |
-| Sandbox Lifecycle (Section 6) | ~80% | Pool manager, openshell client, lifecycle automation implemented |
+| Sandbox Lifecycle (Section 6) | ~85% | Pool manager, openshell client, lifecycle automation implemented |
 | Integrations (Section 12) | 0% | UI config only, no backend |
 | Deployment (Section 13) | 0% | No Docker/K3s manifests |
 
@@ -56,7 +56,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] Idle timeout detection (ACTIVE/READY → SUSPENDED after `lifecycle.idle_timeout`)
 - [x] Suspension expiry (SUSPENDED → DESTROYED after `lifecycle.suspend_timeout`)
 - [x] Startup timeout enforcement (`lifecycle.startup_timeout`)
-- [-] Resume timeout enforcement (`lifecycle.resume_timeout`)
+- [x] Resume timeout enforcement (`lifecycle.resume_timeout`)
 - [x] Periodic cleanup loop (background task)
 - [x] Respect `pool.max_sandboxes` and `pool.max_active` limits
 - [x] Health checks / readiness probes for sandbox containers
@@ -122,10 +122,10 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 7. Authentication & Authorization — P1 (PRD Section 12.1)
 
-- [ ] Admin authentication for management API (local credentials)
+- [x] Admin authentication for management API (local credentials + API key)
 - [ ] OIDC/OAuth2 SSO integration (Authentik, Keycloak)
-- [ ] API key management for programmatic access
-- [ ] Open WebUI `X-Open-WebUI-User-Id` header validation on proxy API
+- [x] API key management for programmatic access
+- [x] Open WebUI `X-API-Key` header validation on proxy API
 
 ## 8. Frontend Enhancements — P2 (PRD Section 8)
 
