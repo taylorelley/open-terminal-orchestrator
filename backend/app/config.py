@@ -24,6 +24,21 @@ class Settings(BaseSettings):
     sandbox_port: int = 8000
     proxy_timeout: int = 30
 
+    # Pool defaults (overridden by system_config rows at runtime)
+    pool_warmup_size: int = 2
+    pool_max_sandboxes: int = 20
+    pool_max_active: int = 10
+    default_image_tag: str = "shellguard-sandbox:slim"
+
+    # Lifecycle timeouts (seconds)
+    idle_timeout: int = 1800  # 30 minutes
+    suspend_timeout: int = 86400  # 24 hours
+    startup_timeout: int = 120  # 2 minutes
+    resume_timeout: int = 30  # 30 seconds
+
+    # Pool manager loop interval (seconds)
+    cleanup_interval: int = 30
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8080
