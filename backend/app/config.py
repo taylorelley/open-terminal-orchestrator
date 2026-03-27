@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     open_webui_api_key: str = ""
     admin_api_key: str = ""
 
+    # Proxy
+    sandbox_port: int = 8000
+    proxy_timeout: int = 30
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8080
