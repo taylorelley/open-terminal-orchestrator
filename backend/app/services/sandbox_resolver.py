@@ -220,6 +220,47 @@ async def _background_resume(sandbox_name: str, sandbox_id: uuid.UUID) -> None:
                 await db.rollback()
 
 
+async def _recreate_sandbox_for_policy(
+    old_sandbox: Sandbox,
+    user: User,
+    db: AsyncSession,
+    request: Request,
+) -> ResolvedSandbox:
+    """Destroy a sandbox marked for recreation and provision a replacement.
+
+    Raises HTTPException(503) if no pool sandbox is available.
+    """
+    now = datetime.now(timezone.utc)
+
+    try:
+        await openshell_client.destroy_sandbox(old_sandbox.name)
+    except openshell_client.OpenShellError:
+        logger.warning(
+            "Failed to destroy sandbox %s during policy recreation", old_sandbox.name,
+        )
+
+    old_sandbox.state = "DESTROYED"
+    old_sandbox.destroyed_at = now
+    old_sandbox.pending_recreation = False
+
+    log_lifecycle(
+        db, "destroyed",
+        user_id=user.id,
+        sandbox_id=old_sandbox.id,
+        details={"reason": "policy_recreation"},
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.flush()
+
+    claimed = await _claim_pool_sandbox(user, db)
+    if claimed is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Sandbox recreation pending — no pool sandbox available",
+        )
+    return ResolvedSandbox(sandbox=claimed, user=user)
+
+
 async def resolve_sandbox(request: Request, db: AsyncSession) -> ResolvedSandbox:
     """Identify the calling user and return their ready sandbox.
 
@@ -234,6 +275,13 @@ async def resolve_sandbox(request: Request, db: AsyncSession) -> ResolvedSandbox
 
     if sandbox is not None:
         if sandbox.state in ("ACTIVE", "READY"):
+            # If the sandbox is marked for recreation due to static policy
+            # changes, destroy it and provision a fresh one from the pool.
+            if sandbox.pending_recreation:
+                return await _recreate_sandbox_for_policy(
+                    sandbox, user, db, request,
+                )
+
             sandbox.last_active_at = datetime.now(timezone.utc)
             if sandbox.state == "READY":
                 sandbox.state = "ACTIVE"

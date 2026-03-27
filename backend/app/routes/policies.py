@@ -14,12 +14,19 @@ from app.schemas import (
     PolicyAssignmentCreate,
     PolicyAssignmentResponse,
     PolicyCreate,
+    PolicyDiffResponse,
     PolicyResponse,
     PolicyUpdate,
     PolicyVersionResponse,
 )
 from app.services.audit_service import log_admin
-from app.services.policy_engine import validate_policy_yaml
+from app.services.policy_engine import (
+    classify_policy_changes,
+    diff_policy_yaml,
+    mark_sandboxes_for_recreation,
+    propagate_policy_to_sandboxes,
+    validate_policy_yaml,
+)
 
 router = APIRouter(prefix="/admin/api", tags=["policies"])
 
@@ -117,11 +124,19 @@ async def update_policy(
         row.description = body.description
 
     # If YAML changed, validate, bump version and create a new PolicyVersion record
-    if body.yaml is not None and body.yaml != row.yaml:
+    hot_reloaded_count = 0
+    recreation_scheduled = 0
+    yaml_changed = body.yaml is not None and body.yaml != row.yaml
+
+    if yaml_changed:
+        assert body.yaml is not None  # for type narrowing
         valid, errors = validate_policy_yaml(body.yaml)
         if not valid:
             raise HTTPException(status_code=422, detail={"errors": errors})
+
+        old_yaml = row.yaml
         row.yaml = body.yaml
+
         # Simple semver bump: increment patch
         parts = row.current_version.split(".")
         parts[-1] = str(int(parts[-1]) + 1)
@@ -137,6 +152,20 @@ async def update_policy(
         )
         db.add(version)
 
+        # Classify changes and propagate/schedule recreation accordingly.
+        source_ip = request.client.host if request.client else ""
+        has_dynamic, has_static = classify_policy_changes(old_yaml, body.yaml)
+
+        if has_static:
+            # Static sections changed — sandboxes must be recreated.
+            recreation_scheduled = await mark_sandboxes_for_recreation(row.id, db)
+        elif has_dynamic:
+            # Only dynamic sections changed — hot-reload on live sandboxes.
+            updated_ids = await propagate_policy_to_sandboxes(
+                row, db, source_ip=source_ip,
+            )
+            hot_reloaded_count = len(updated_ids)
+
     row.updated_at = now
 
     changes = [k for k in ("name", "tier", "description", "yaml") if getattr(body, k, None) is not None]
@@ -147,6 +176,8 @@ async def update_policy(
             "policy_id": str(policy_id),
             "policy_name": row.name,
             "changes": changes,
+            "hot_reloaded_count": hot_reloaded_count,
+            "recreation_scheduled": recreation_scheduled,
         },
         source_ip=request.client.host if request.client else "",
     )
@@ -195,6 +226,44 @@ async def list_policy_versions(
         )
     ).scalars().all()
     return rows
+
+
+@router.get("/policies/{policy_id}/diff", response_model=PolicyDiffResponse)
+async def diff_policy_versions(
+    policy_id: uuid.UUID,
+    from_version: str = Query(..., description="Source version string"),
+    to_version: str = Query(..., description="Target version string"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return a structured diff between two versions of a policy."""
+    from_row = (
+        await db.execute(
+            select(PolicyVersion).where(
+                PolicyVersion.policy_id == policy_id,
+                PolicyVersion.version == from_version,
+            )
+        )
+    ).scalar_one_or_none()
+    if not from_row:
+        raise HTTPException(status_code=404, detail=f"Version '{from_version}' not found")
+
+    to_row = (
+        await db.execute(
+            select(PolicyVersion).where(
+                PolicyVersion.policy_id == policy_id,
+                PolicyVersion.version == to_version,
+            )
+        )
+    ).scalar_one_or_none()
+    if not to_row:
+        raise HTTPException(status_code=404, detail=f"Version '{to_version}' not found")
+
+    result = diff_policy_yaml(from_row.yaml, to_row.yaml)
+    return PolicyDiffResponse(
+        from_version=from_version,
+        to_version=to_version,
+        **result,
+    )
 
 
 @router.post("/policies/{policy_id}/validate")

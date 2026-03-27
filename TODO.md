@@ -16,7 +16,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
 | Management API (Section 9.2) | ~90% | All CRUD endpoints implemented; backup endpoint pending |
-| Policy Engine (Section 7) | ~40% | Resolution, validation, sandbox application done; hot-reload/diff pending |
+| Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff all implemented |
 | Sandbox Lifecycle (Section 6) | ~80% | Pool manager, openshell client, lifecycle automation implemented |
 | Integrations (Section 12) | 0% | UI config only, no backend |
 | Deployment (Section 13) | 0% | No Docker/K3s manifests |
@@ -66,10 +66,10 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] YAML validation against OpenShell policy schema
 - [x] Policy resolution: user → group → role → system default (priority cascade)
 - [x] Apply policy at sandbox creation via `openshell policy set`
-- [ ] Hot-reload dynamic policy sections (network, inference) on running sandboxes
-- [ ] Schedule sandbox recreation for static policy changes (filesystem, process)
+- [x] Hot-reload dynamic policy sections (network, inference) on running sandboxes
+- [x] Schedule sandbox recreation for static policy changes (filesystem, process)
 - [x] Dry-run / validate policy against OpenShell without applying
-- [ ] Policy diff view between versions (backend support)
+- [x] Policy diff view between versions (backend support)
 
 ## 5. Audit Logger — P1 (PRD Section 5.2, 8.7)
 
@@ -130,7 +130,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 ## 8. Frontend Enhancements — P2 (PRD Section 8)
 
 - [-] YAML editor schema validation (UI exists, no backend validation endpoint)
-- [-] Policy diff view between versions (UI exists, needs backend diff data)
+- [-] Policy diff view between versions (UI exists, backend diff endpoint ready)
 - [ ] Real-time streaming mode for audit log (Supabase realtime partially wired)
 - [ ] Saved filter presets for audit log
 - [ ] Threshold alerts configuration in monitoring
