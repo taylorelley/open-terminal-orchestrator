@@ -9,8 +9,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import AuditLogEntry, Sandbox, SystemConfig
+from app.models import AuditLogEntry, Policy, Sandbox, SystemConfig
 from app.services import openshell_client
+from app.services.policy_engine import apply_policy_to_sandbox
 
 logger = logging.getLogger(__name__)
 from app.schemas import (
@@ -152,7 +153,20 @@ async def update_sandbox_policy(
     if not row:
         raise HTTPException(status_code=404, detail="Sandbox not found")
 
-    row.policy_id = body.policy_id
+    policy = (await db.execute(select(Policy).where(Policy.id == body.policy_id))).scalar_one_or_none()
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+
+    # Apply via openshell if sandbox is running; otherwise just store the assignment.
+    if row.state in ("ACTIVE", "READY"):
+        try:
+            await apply_policy_to_sandbox(row, policy, db)
+        except Exception:
+            logger.exception("Failed to apply policy to sandbox %s via openshell", row.name)
+            raise HTTPException(status_code=502, detail="Failed to apply policy via openshell")
+    else:
+        row.policy_id = body.policy_id
+
     await db.flush()
     await db.refresh(row)
     return row

@@ -16,7 +16,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
 | Management API (Section 9.2) | ~90% | All CRUD endpoints implemented; backup endpoint pending |
-| Policy Engine (Section 7) | 0% | UI only, no enforcement |
+| Policy Engine (Section 7) | ~40% | Resolution, validation, sandbox application done; hot-reload/diff pending |
 | Sandbox Lifecycle (Section 6) | ~80% | Pool manager, openshell client, lifecycle automation implemented |
 | Integrations (Section 12) | 0% | UI config only, no backend |
 | Deployment (Section 13) | 0% | No Docker/K3s manifests |
@@ -63,12 +63,12 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 4. Policy Engine — P0 (PRD Section 7)
 
-- [ ] YAML validation against OpenShell policy schema
-- [ ] Policy resolution: user → group → role → system default (priority cascade)
-- [ ] Apply policy at sandbox creation via `openshell policy set`
+- [x] YAML validation against OpenShell policy schema
+- [x] Policy resolution: user → group → role → system default (priority cascade)
+- [x] Apply policy at sandbox creation via `openshell policy set`
 - [ ] Hot-reload dynamic policy sections (network, inference) on running sandboxes
 - [ ] Schedule sandbox recreation for static policy changes (filesystem, process)
-- [ ] Dry-run / validate policy against OpenShell without applying
+- [x] Dry-run / validate policy against OpenShell without applying
 - [ ] Policy diff view between versions (backend support)
 
 ## 5. Audit Logger — P1 (PRD Section 5.2, 8.7)
@@ -101,7 +101,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] `PUT /admin/api/policies/{id}` — update policy (creates new version)
 - [x] `DELETE /admin/api/policies/{id}` — delete policy
 - [x] `GET /admin/api/policies/{id}/versions` — version history
-- [-] `POST /admin/api/policies/{id}/validate` — dry-run validation (placeholder, needs openshell)
+- [x] `POST /admin/api/policies/{id}/validate` — YAML schema validation
 - [x] `GET /admin/api/policies/assignments` — list all assignments
 - [x] `PUT /admin/api/policies/assignments` — update assignments
 
