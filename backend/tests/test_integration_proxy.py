@@ -132,6 +132,50 @@ class TestProxyRouting:
         assert call_args[0][2] == "/api/search"
 
 
+class TestLLMProxyRouting:
+    """Verify LiteLLM proxy endpoints resolve a sandbox and forward the request."""
+
+    @pytest.mark.asyncio
+    @patch("app.routes.proxy.forward_request")
+    @patch("app.routes.proxy.resolve_sandbox")
+    async def test_chat_completions_forwards(self, mock_resolve, mock_forward, client):
+        mock_resolve.return_value = _make_resolved()
+        mock_forward.return_value = _make_stream_response(b'{"choices":[]}')
+
+        resp = await client.post("/v1/chat/completions", json={"model": "gpt-4", "messages": []})
+
+        assert resp.status_code == 200
+        call_args = mock_forward.call_args
+        assert call_args[0][1] == "10.0.0.1"
+        assert call_args[0][2] == "/v1/chat/completions"
+
+    @pytest.mark.asyncio
+    @patch("app.routes.proxy.forward_request")
+    @patch("app.routes.proxy.resolve_sandbox")
+    async def test_completions_forwards(self, mock_resolve, mock_forward, client):
+        mock_resolve.return_value = _make_resolved()
+        mock_forward.return_value = _make_stream_response(b'{"choices":[]}')
+
+        resp = await client.post("/v1/completions", json={"model": "gpt-4", "prompt": "Hello"})
+
+        assert resp.status_code == 200
+        call_args = mock_forward.call_args
+        assert call_args[0][2] == "/v1/completions"
+
+    @pytest.mark.asyncio
+    @patch("app.routes.proxy.forward_request")
+    @patch("app.routes.proxy.resolve_sandbox")
+    async def test_list_models_forwards(self, mock_resolve, mock_forward, client):
+        mock_resolve.return_value = _make_resolved()
+        mock_forward.return_value = _make_stream_response(b'{"data":[]}')
+
+        resp = await client.get("/v1/models")
+
+        assert resp.status_code == 200
+        call_args = mock_forward.call_args
+        assert call_args[0][2] == "/v1/models"
+
+
 class TestProxyErrors:
     """Verify error handling in the proxy layer."""
 

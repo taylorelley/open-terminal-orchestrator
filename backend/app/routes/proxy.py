@@ -88,3 +88,26 @@ async def download_file(path: str, request: Request, db: AsyncSession = Depends(
 async def search_files(request: Request, db: AsyncSession = Depends(get_db)) -> StreamingResponse:
     """Search files in the user's sandbox."""
     return await _proxy(request, "/api/search", db)
+
+
+# ------------------------------------------------------------------
+# LLM Inference (LiteLLM proxy)
+# ------------------------------------------------------------------
+
+
+@router.post("/v1/chat/completions")
+async def chat_completions(request: Request, db: AsyncSession = Depends(get_db)) -> StreamingResponse:
+    """Proxy OpenAI-compatible chat completions through the user's sandbox."""
+    return await _proxy(request, "/v1/chat/completions", db)
+
+
+@router.post("/v1/completions")
+async def completions(request: Request, db: AsyncSession = Depends(get_db)) -> StreamingResponse:
+    """Proxy OpenAI-compatible completions through the user's sandbox."""
+    return await _proxy(request, "/v1/completions", db)
+
+
+@router.get("/v1/models")
+async def list_models(request: Request, db: AsyncSession = Depends(get_db)) -> StreamingResponse:
+    """List available models via the user's sandbox LiteLLM proxy."""
+    return await _proxy(request, "/v1/models", db)

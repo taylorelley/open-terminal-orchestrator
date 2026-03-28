@@ -14,6 +14,7 @@ lifespan and cancelled on shutdown.
 
 import asyncio
 import logging
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -108,12 +109,15 @@ async def _replenish_pool(db: AsyncSession, cfg: dict) -> None:
         # Issue the openshell create in the background — the periodic loop
         # will detect WARMING → READY transition or timeout.
         try:
+            _start = time.monotonic()
             info = await openshell_client.create_sandbox(
                 name=name,
                 image_tag=settings.default_image_tag,
             )
             sandbox.internal_ip = info.internal_ip
             sandbox.state = "READY"
+            from app.metrics import record_startup_duration
+            record_startup_duration(time.monotonic() - _start)
             log_lifecycle(db, "ready", sandbox=sandbox, details={"trigger": "pool_replenish"})
             logger.info("Sandbox %s is READY (ip=%s)", name, info.internal_ip)
         except Exception:

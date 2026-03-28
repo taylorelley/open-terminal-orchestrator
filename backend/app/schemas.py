@@ -267,6 +267,58 @@ class ProxyErrorResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Webhooks
+# ---------------------------------------------------------------------------
+
+
+class WebhookEventFilter(BaseModel):
+    category: str | None = None
+    event_type: str | None = None
+
+
+class WebhookConfigCreate(BaseModel):
+    url: str
+    secret: str = ""
+    enabled: bool = True
+    event_filters: list[WebhookEventFilter] = []
+
+
+class WebhookConfigResponse(BaseModel):
+    index: int
+    url: str
+    enabled: bool
+    event_filters: list[WebhookEventFilter] = []
+
+
+class WebhookConfigUpdate(BaseModel):
+    url: str | None = None
+    secret: str | None = None
+    enabled: bool | None = None
+    event_filters: list[WebhookEventFilter] | None = None
+
+
+# ---------------------------------------------------------------------------
+# Syslog
+# ---------------------------------------------------------------------------
+
+
+class SyslogConfigResponse(BaseModel):
+    host: str
+    port: int
+    protocol: str
+    facility: int
+    app_name: str
+
+
+class SyslogConfigUpdate(BaseModel):
+    host: str
+    port: int = 514
+    protocol: str = "udp"
+    facility: int = 1
+    app_name: str = "shellguard"
+
+
 class PoolStatusResponse(BaseModel):
     total: int = 0
     active: int = 0
