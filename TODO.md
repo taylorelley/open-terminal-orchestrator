@@ -19,7 +19,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff all implemented |
 | Sandbox Lifecycle (Section 6) | ~85% | Pool manager, openshell client, lifecycle automation implemented |
 | Integrations (Section 12) | 0% | UI config only, no backend |
-| Deployment (Section 13) | 0% | No Docker/K3s manifests |
+| Deployment (Section 13) | ~50% | Dockerfile + docker-compose + .env.example done; K3s/TLS/migrations remaining |
 
 ---
 
@@ -159,10 +159,10 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 11. Deployment — P2 (PRD Section 13)
 
-- [ ] `docker-compose.yml` — reference deployment (orchestrator + PostgreSQL + frontend)
-- [ ] `Dockerfile` — ShellGuard orchestrator container
+- [x] `docker-compose.yml` — reference deployment (orchestrator + PostgreSQL + frontend)
+- [x] `Dockerfile` — ShellGuard orchestrator container (multi-stage: Node + Python)
 - [ ] Kubernetes/K3s manifests for production deployment
-- [ ] Environment variable documentation and `.env.example`
+- [x] Environment variable documentation and `.env.example`
 - [ ] Database initialization and migration scripts (for non-Supabase PostgreSQL)
 - [ ] TLS/reverse proxy configuration guide
 
