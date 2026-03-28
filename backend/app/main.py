@@ -20,6 +20,7 @@ from app.routes.policies import router as policies_router
 from app.routes.proxy import router as proxy_router
 from app.routes.sandboxes import router as sandboxes_router
 from app.routes.system import router as system_router
+from app.routes.auth import router as auth_router
 from app.routes.users import router as users_router
 from app.services.audit_service import audit_retention_manager
 from app.services.pool_manager import pool_manager
@@ -68,6 +69,7 @@ configure_cors(app)
 
 # API routes
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(proxy_router)
 app.include_router(sandboxes_router)
 app.include_router(policies_router)

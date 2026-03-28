@@ -38,6 +38,7 @@ interface ConfigState {
     method: string;
     oidc_issuer: string;
     oidc_client_id: string;
+    oidc_client_secret: string;
     oidc_redirect_uri: string;
   };
   integrations: {
@@ -52,7 +53,7 @@ const defaultConfig: ConfigState = {
   general: { instance_name: '', base_url: '', openshell_gateway: '', owui_endpoint: '', byoc_image: '' },
   pool: { warmup_size: 2, max_sandboxes: 20, max_active: 10 },
   lifecycle: { idle_timeout: '30m', suspend_timeout: '24h', startup_timeout: '120s', resume_timeout: '30s' },
-  auth: { method: 'local', oidc_issuer: '', oidc_client_id: '', oidc_redirect_uri: '' },
+  auth: { method: 'local', oidc_issuer: '', oidc_client_id: '', oidc_client_secret: '', oidc_redirect_uri: '' },
   integrations: { litellm_url: '', prometheus_enabled: true, webhook_url: '', syslog_enabled: false },
 };
 
@@ -268,34 +269,40 @@ export default function Settings() {
           <div className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
             <h3 className="text-sm font-semibold text-zinc-900">Authentication Method</h3>
             <div className="flex gap-3">
-              {['local', 'oidc'].map((method) => (
+              {[
+                { id: 'local', label: 'Local Credentials' },
+                { id: 'oidc', label: 'OIDC / SSO' },
+                { id: 'both', label: 'Both' },
+              ].map((method) => (
                 <button
-                  key={method}
-                  onClick={() => updateConfig('auth', 'method', method)}
+                  key={method.id}
+                  onClick={() => updateConfig('auth', 'method', method.id)}
                   className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                    config.auth.method === method
+                    config.auth.method === method.id
                       ? 'border-teal-500 bg-teal-50 text-teal-700'
                       : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'
                   }`}
                 >
-                  {method === 'local' ? 'Local Credentials' : 'OIDC / SSO'}
+                  {method.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {config.auth.method === 'oidc' && (
+          {(config.auth.method === 'oidc' || config.auth.method === 'both') && (
             <div className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
               <h3 className="text-sm font-semibold text-zinc-900">OIDC Configuration</h3>
+              <p className="text-xs text-zinc-400">Configure your Authentik, Keycloak, or other OIDC provider.</p>
               {[
-                { label: 'Issuer URL', field: 'oidc_issuer', placeholder: 'https://auth.example.com/application/o/shellguard/' },
-                { label: 'Client ID', field: 'oidc_client_id', placeholder: 'shellguard-client' },
-                { label: 'Redirect URI', field: 'oidc_redirect_uri', placeholder: 'http://shellguard:8080/admin/callback' },
+                { label: 'Issuer URL', field: 'oidc_issuer', placeholder: 'https://auth.example.com/application/o/shellguard/', type: 'text' },
+                { label: 'Client ID', field: 'oidc_client_id', placeholder: 'shellguard-client', type: 'text' },
+                { label: 'Client Secret', field: 'oidc_client_secret', placeholder: 'Enter client secret', type: 'password' },
+                { label: 'Redirect URI', field: 'oidc_redirect_uri', placeholder: 'http://shellguard:8080/admin/api/auth/oidc/callback', type: 'text' },
               ].map((item) => (
                 <div key={item.field}>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">{item.label}</label>
                   <input
-                    type="text"
+                    type={item.type}
                     value={(config.auth as Record<string, string>)[item.field] || ''}
                     onChange={(e) => updateConfig('auth', item.field, e.target.value)}
                     placeholder={item.placeholder}

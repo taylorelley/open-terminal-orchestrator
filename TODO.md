@@ -15,7 +15,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | Database Schema (Section 10) | 100% | All tables, RLS, indexes in place |
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
-| Management API (Section 9.2) | ~98% | All CRUD endpoints implemented; user sync placeholder remaining |
+| Management API (Section 9.2) | 100% | All CRUD endpoints implemented |
 | Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff all implemented |
 | Sandbox Lifecycle (Section 6) | ~85% | Pool manager, openshell client, lifecycle automation implemented |
 | Integrations (Section 12) | 0% | UI config only, no backend |
@@ -106,7 +106,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] `PUT /admin/api/policies/assignments` — update assignments
 
 ### Users & Groups
-- [-] `POST /admin/api/users/sync` — sync users from Open WebUI (placeholder, needs OWUI API)
+- [x] `POST /admin/api/users/sync` — sync users from Open WebUI
 - [x] `GET /admin/api/users` — list users
 - [x] `GET /admin/api/groups` — list groups
 - [x] `POST /admin/api/groups` — create group
@@ -123,14 +123,14 @@ Project completeness assessment against [PRD.md](./PRD.md).
 ## 7. Authentication & Authorization — P1 (PRD Section 12.1)
 
 - [x] Admin authentication for management API (local credentials + API key)
-- [ ] OIDC/OAuth2 SSO integration (Authentik, Keycloak)
+- [x] OIDC/OAuth2 SSO integration (Authentik, Keycloak)
 - [x] API key management for programmatic access
 - [x] Open WebUI `X-API-Key` header validation on proxy API
 
 ## 8. Frontend Enhancements — P2 (PRD Section 8)
 
-- [-] YAML editor schema validation (UI exists, no backend validation endpoint)
-- [-] Policy diff view between versions (UI exists, backend diff endpoint ready)
+- [x] YAML editor schema validation (frontend wired to backend validation endpoint)
+- [x] Policy diff view between versions (UI + backend diff endpoint integrated)
 - [ ] Real-time streaming mode for audit log (Supabase realtime partially wired)
 - [ ] Saved filter presets for audit log
 - [ ] Threshold alerts configuration in monitoring
