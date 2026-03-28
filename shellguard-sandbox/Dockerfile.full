@@ -1,0 +1,16 @@
+# ShellGuard Sandbox — Full Variant
+# Extended Open Terminal image with additional tooling support.
+# Use this variant when sandboxes need pre-installed language runtimes,
+# data science libraries, or other packages beyond the slim base.
+
+FROM ghcr.io/open-webui/open-terminal:latest
+
+LABEL org.opencontainers.image.title="ShellGuard Sandbox (Full)"
+LABEL org.opencontainers.image.description="Open Terminal in OpenShell sandbox — full variant"
+LABEL org.opencontainers.image.source="https://github.com/taylorelley/shellguard"
+
+# Health check for pool manager readiness probes
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
+  CMD curl -sf http://localhost:8000/health || exit 1
+
+EXPOSE 8000
