@@ -11,6 +11,8 @@ import {
   MemoryStick,
   Play,
   Search,
+  Terminal,
+  X,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Tabs } from '../components/ui/Tabs';
@@ -18,6 +20,7 @@ import { Badge } from '../components/ui/Badge';
 import { SlidePanel } from '../components/ui/SlidePanel';
 import { LoadingState, EmptyState } from '../components/ui/EmptyState';
 import { Modal } from '../components/ui/Modal';
+import { TerminalEmbed } from '../components/TerminalEmbed';
 import { formatRelativeTime, formatUptime, formatBytes } from '../lib/utils';
 import type { Sandbox, AuditLogEntry } from '../types';
 
@@ -29,6 +32,9 @@ export default function Sandboxes() {
   const [sandboxLogs, setSandboxLogs] = useState<AuditLogEntry[]>([]);
   const [confirmAction, setConfirmAction] = useState<{ sandbox: Sandbox; action: string } | null>(null);
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   const fetchSandboxes = useCallback(async () => {
     const { data } = await supabase
@@ -56,6 +62,7 @@ export default function Sandboxes() {
 
   const handleSelectSandbox = (sb: Sandbox) => {
     setSelectedSandbox(sb);
+    setTerminalOpen(false);
     fetchSandboxLogs(sb.id);
   };
 
@@ -81,6 +88,32 @@ export default function Sandboxes() {
     fetchSandboxes();
   };
 
+  const handleBulkAction = async (action: string) => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      await fetch('/admin/api/sandboxes/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, sandbox_ids: Array.from(selectedIds) }),
+      });
+      setSelectedIds(new Set());
+      fetchSandboxes();
+    } catch {
+      // ignore
+    }
+    setBulkLoading(false);
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const activeSandboxes = sandboxes.filter((s) => ['ACTIVE', 'READY'].includes(s.state));
   const suspendedSandboxes = sandboxes.filter((s) => s.state === 'SUSPENDED');
   const poolSandboxes = sandboxes.filter((s) => ['POOL', 'WARMING'].includes(s.state) && !s.user_id);
@@ -101,11 +134,29 @@ export default function Sandboxes() {
     sb.user?.username?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const allFilteredSelected = filtered.length > 0 && filtered.every((sb) => selectedIds.has(sb.id));
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((sb) => next.delete(sb.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((sb) => next.add(sb.id));
+        return next;
+      });
+    }
+  };
+
   if (loading) return <LoadingState rows={8} />;
 
   return (
     <div className="space-y-4">
-      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+      <Tabs tabs={tabs} activeTab={activeTab} onChange={(t) => { setActiveTab(t); setSelectedIds(new Set()); }} />
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -119,6 +170,46 @@ export default function Sandboxes() {
           />
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5">
+          <span className="text-sm font-medium text-teal-800">{selectedIds.size} selected</span>
+          <div className="flex items-center gap-2 ml-auto">
+            {activeTab === 'active' && (
+              <button
+                onClick={() => handleBulkAction('suspend')}
+                disabled={bulkLoading}
+                className="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                Suspend Selected
+              </button>
+            )}
+            {activeTab === 'suspended' && (
+              <button
+                onClick={() => handleBulkAction('resume')}
+                disabled={bulkLoading}
+                className="px-3 py-1.5 bg-teal-100 hover:bg-teal-200 text-teal-700 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                Resume Selected
+              </button>
+            )}
+            <button
+              onClick={() => handleBulkAction('destroy')}
+              disabled={bulkLoading}
+              className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+            >
+              Destroy Selected
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="p-1.5 rounded-lg hover:bg-teal-100 text-teal-600 transition-colors"
+              title="Deselect All"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
         {filtered.length === 0 ? (
@@ -136,6 +227,14 @@ export default function Sandboxes() {
             <table className="w-full">
               <thead>
                 <tr className="text-left text-xs text-zinc-500 border-b border-zinc-100">
+                  <th className="px-3 py-3 font-medium w-10">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      className="rounded border-zinc-300 text-teal-600 focus:ring-teal-500/20"
+                    />
+                  </th>
                   <th className="px-5 py-3 font-medium">
                     {activeTab === 'pool' ? 'Sandbox' : 'User'}
                   </th>
@@ -169,6 +268,14 @@ export default function Sandboxes() {
                     className="hover:bg-zinc-50/50 transition-colors cursor-pointer"
                     onClick={() => handleSelectSandbox(sb)}
                   >
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(sb.id)}
+                        onChange={() => toggleSelected(sb.id)}
+                        className="rounded border-zinc-300 text-teal-600 focus:ring-teal-500/20"
+                      />
+                    </td>
                     <td className="px-5 py-3">
                       {sb.user ? (
                         <div className="flex items-center gap-2">
@@ -264,7 +371,7 @@ export default function Sandboxes() {
 
       <SlidePanel
         open={!!selectedSandbox}
-        onClose={() => setSelectedSandbox(null)}
+        onClose={() => { setSelectedSandbox(null); setTerminalOpen(false); }}
         title={selectedSandbox?.name || ''}
         subtitle={selectedSandbox?.user?.username ? `Assigned to ${selectedSandbox.user.username}` : 'Unassigned'}
       >
@@ -363,6 +470,19 @@ export default function Sandboxes() {
                 </div>
               )}
             </div>
+
+            {['ACTIVE', 'READY'].includes(selectedSandbox.state) && (
+              <div>
+                <button
+                  onClick={() => setTerminalOpen(!terminalOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                  {terminalOpen ? 'Close Terminal' : 'Open Terminal'}
+                </button>
+                <TerminalEmbed sandboxId={selectedSandbox.id} visible={terminalOpen} />
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2 border-t border-zinc-100">
               {selectedSandbox.state === 'SUSPENDED' && (

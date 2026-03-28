@@ -1,10 +1,11 @@
 """Sandbox management API routes."""
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +19,9 @@ from app.services.policy_engine import apply_policy_to_sandbox
 logger = logging.getLogger(__name__)
 from app.schemas import (
     AuditLogResponse,
+    BulkActionResponse,
+    BulkSandboxAction,
+    BulkSandboxResult,
     PaginatedResponse,
     PoolStatusResponse,
     SandboxResponse,
@@ -225,6 +229,167 @@ async def get_sandbox_logs(
     rows = (await db.execute(query)).scalars().all()
 
     return PaginatedResponse(items=rows, total=total, offset=offset, limit=limit)
+
+
+# ---------------------------------------------------------------------------
+# Terminal WebSocket
+# ---------------------------------------------------------------------------
+
+
+@router.websocket("/sandboxes/{sandbox_id}/terminal")
+async def sandbox_terminal(
+    websocket: WebSocket,
+    sandbox_id: uuid.UUID,
+):
+    """Bidirectional WebSocket relay to a sandbox's terminal.
+
+    Authentication is via query parameter ``token`` since WebSocket
+    connections cannot send custom headers easily.
+    """
+    from app.config import settings
+    from app.database import async_session as _async_session
+
+    token = websocket.query_params.get("token", "")
+    if not token or token != settings.admin_api_key:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    async with _async_session() as db:
+        row = (await db.execute(select(Sandbox).where(Sandbox.id == sandbox_id))).scalar_one_or_none()
+
+    if not row:
+        await websocket.close(code=4004, reason="Sandbox not found")
+        return
+
+    if row.state not in ("ACTIVE", "READY"):
+        await websocket.close(code=4009, reason=f"Sandbox in state {row.state}")
+        return
+
+    await websocket.accept()
+
+    sandbox_ws_url = f"ws://{row.internal_ip}:{settings.sandbox_port}/ws/terminal"
+    try:
+        import httpx
+
+        async with httpx.AsyncClient() as client:
+            # Since httpx doesn't support WebSocket, we use a simple HTTP-based
+            # relay pattern. For a real deployment, this would use a native WS library.
+            # Here we simulate the terminal interaction by relaying data.
+            try:
+                while True:
+                    data = await websocket.receive_text()
+                    # Forward command to sandbox via HTTP exec endpoint
+                    resp = await client.post(
+                        f"http://{row.internal_ip}:{settings.sandbox_port}/api/execute",
+                        json={"command": data},
+                        timeout=settings.proxy_timeout,
+                    )
+                    if resp.status_code == 200:
+                        result = resp.json()
+                        output = result.get("output", result.get("stdout", ""))
+                        if output:
+                            await websocket.send_text(output)
+                    else:
+                        await websocket.send_text(f"\r\nError: {resp.status_code}\r\n")
+            except WebSocketDisconnect:
+                pass
+    except Exception:
+        logger.exception("Terminal WebSocket error for sandbox %s", sandbox_id)
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Bulk Actions
+# ---------------------------------------------------------------------------
+
+
+@router.post("/sandboxes/bulk", response_model=BulkActionResponse)
+async def bulk_sandbox_action(
+    request: Request,
+    body: BulkSandboxAction,
+    db: AsyncSession = Depends(get_db),
+):
+    if body.action not in ("suspend", "resume", "destroy"):
+        raise HTTPException(status_code=400, detail=f"Invalid action: {body.action}")
+
+    results: list[BulkSandboxResult] = []
+    succeeded = 0
+    failed = 0
+
+    for sandbox_id in body.sandbox_ids:
+        row = (await db.execute(select(Sandbox).where(Sandbox.id == sandbox_id))).scalar_one_or_none()
+        if not row:
+            results.append(BulkSandboxResult(sandbox_id=sandbox_id, status="error", error="Not found"))
+            failed += 1
+            continue
+
+        try:
+            if body.action == "suspend":
+                if row.state not in ("ACTIVE", "READY"):
+                    results.append(BulkSandboxResult(
+                        sandbox_id=sandbox_id, status="error",
+                        error=f"Cannot suspend sandbox in state {row.state}",
+                    ))
+                    failed += 1
+                    continue
+                await openshell_client.suspend_sandbox(row.name)
+                row.state = "SUSPENDED"
+                row.suspended_at = datetime.now(timezone.utc)
+                row.cpu_usage = 0
+                row.memory_usage = 0
+                row.network_io = 0
+
+            elif body.action == "resume":
+                if row.state != "SUSPENDED":
+                    results.append(BulkSandboxResult(
+                        sandbox_id=sandbox_id, status="error",
+                        error=f"Cannot resume sandbox in state {row.state}",
+                    ))
+                    failed += 1
+                    continue
+                info = await openshell_client.resume_sandbox(row.name)
+                row.state = "ACTIVE"
+                row.suspended_at = None
+                row.last_active_at = datetime.now(timezone.utc)
+                row.internal_ip = info.internal_ip or row.internal_ip
+
+            elif body.action == "destroy":
+                if row.state == "DESTROYED":
+                    results.append(BulkSandboxResult(
+                        sandbox_id=sandbox_id, status="error",
+                        error="Already destroyed",
+                    ))
+                    failed += 1
+                    continue
+                try:
+                    await openshell_client.destroy_sandbox(row.name)
+                except Exception:
+                    logger.exception("openshell destroy failed for %s in bulk", row.name)
+                row.state = "DESTROYED"
+                row.destroyed_at = datetime.now(timezone.utc)
+                row.cpu_usage = 0
+                row.memory_usage = 0
+                row.network_io = 0
+
+            log_admin(
+                db, "policy_change",
+                details={"action": f"bulk_{body.action}", "sandbox_name": row.name, "sandbox_id": str(sandbox_id)},
+                source_ip=request.client.host if request.client else "",
+            )
+            await db.flush()
+            results.append(BulkSandboxResult(sandbox_id=sandbox_id, status="ok"))
+            succeeded += 1
+
+        except Exception as exc:
+            logger.exception("Bulk %s failed for sandbox %s", body.action, sandbox_id)
+            results.append(BulkSandboxResult(sandbox_id=sandbox_id, status="error", error=str(exc)))
+            failed += 1
+
+    return BulkActionResponse(results=results, succeeded=succeeded, failed=failed)
 
 
 # ---------------------------------------------------------------------------

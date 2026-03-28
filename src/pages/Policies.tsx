@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, DragEvent } from 'react';
 import {
   Shield,
   Plus,
@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   AlertTriangle,
   CheckCircle,
+  GripVertical,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Tabs } from '../components/ui/Tabs';
@@ -393,104 +394,159 @@ export default function Policies() {
       )}
 
       {activeTab === 'assignments' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-zinc-100">
-              <h3 className="text-sm font-semibold text-zinc-900">User Overrides</h3>
-              <p className="text-xs text-zinc-400">Highest priority</p>
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-zinc-200 p-4">
+            <p className="text-xs font-medium text-zinc-500 mb-2">Drag a policy to assign it to a user, group, or role below</p>
+            <div className="flex flex-wrap gap-2">
+              {policies.map((p) => (
+                <div
+                  key={p.id}
+                  draggable
+                  onDragStart={(e: DragEvent) => {
+                    e.dataTransfer.setData('application/x-policy-id', p.id);
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 border border-teal-200 rounded-lg cursor-grab active:cursor-grabbing text-xs font-medium text-teal-800 select-none"
+                >
+                  <GripVertical className="w-3 h-3 text-teal-400" />
+                  {p.name}
+                </div>
+              ))}
             </div>
-            <div className="divide-y divide-zinc-50">
-              {users.map((user) => {
-                const userAssignment = assignments.find(
-                  (a) => a.entity_type === 'user' && a.entity_id === user.id
-                );
-                return (
-                  <div key={user.id} className="px-5 py-3 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-zinc-900 truncate">{user.username}</p>
-                      <p className="text-[11px] text-zinc-400">{user.owui_role}</p>
-                    </div>
-                    <select
-                      value={userAssignment?.policy_id || ''}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handleAssignmentChange('user', user.id, e.target.value);
-                        }
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-100">
+                <h3 className="text-sm font-semibold text-zinc-900">User Overrides</h3>
+                <p className="text-xs text-zinc-400">Highest priority</p>
+              </div>
+              <div className="divide-y divide-zinc-50">
+                {users.map((user) => {
+                  const userAssignment = assignments.find(
+                    (a) => a.entity_type === 'user' && a.entity_id === user.id
+                  );
+                  return (
+                    <div
+                      key={user.id}
+                      className="px-5 py-3 flex items-center justify-between gap-2 transition-colors"
+                      onDragOver={(e: DragEvent) => { e.preventDefault(); e.currentTarget.classList.add('bg-teal-50'); }}
+                      onDragLeave={(e: DragEvent) => { e.currentTarget.classList.remove('bg-teal-50'); }}
+                      onDrop={(e: DragEvent) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('bg-teal-50');
+                        const policyId = e.dataTransfer.getData('application/x-policy-id');
+                        if (policyId) handleAssignmentChange('user', user.id, policyId);
                       }}
-                      className="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 max-w-[140px]"
                     >
-                      <option value="">Inherit</option>
-                      {policies.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-zinc-100">
-              <h3 className="text-sm font-semibold text-zinc-900">Group Assignments</h3>
-              <p className="text-xs text-zinc-400">Medium priority</p>
-            </div>
-            <div className="divide-y divide-zinc-50">
-              {groups.map((group) => {
-                const groupAssignment = assignments.find(
-                  (a) => a.entity_type === 'group' && a.entity_id === group.id
-                );
-                return (
-                  <div key={group.id} className="px-5 py-3 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-zinc-900 truncate">{group.name}</p>
-                      <p className="text-[11px] text-zinc-400">{group.description}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-zinc-900 truncate">{user.username}</p>
+                        <p className="text-[11px] text-zinc-400">{user.owui_role}</p>
+                      </div>
+                      <select
+                        value={userAssignment?.policy_id || ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAssignmentChange('user', user.id, e.target.value);
+                          }
+                        }}
+                        className="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 max-w-[140px]"
+                      >
+                        <option value="">Inherit</option>
+                        {policies.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
                     </div>
-                    <select
-                      value={groupAssignment?.policy_id || group.policy_id || ''}
-                      onChange={(e) => handleAssignmentChange('group', group.id, e.target.value)}
-                      className="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 max-w-[140px]"
-                    >
-                      <option value="">None</option>
-                      {policies.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-zinc-100">
-              <h3 className="text-sm font-semibold text-zinc-900">Role Defaults</h3>
-              <p className="text-xs text-zinc-400">Lowest priority</p>
-            </div>
-            <div className="divide-y divide-zinc-50">
-              {['admin', 'user', 'pending'].map((role) => {
-                const roleAssignment = assignments.find(
-                  (a) => a.entity_type === 'role' && a.entity_id === role
-                );
-                return (
-                  <div key={role} className="px-5 py-3 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-medium text-zinc-900 capitalize">{role}</p>
-                      <p className="text-[11px] text-zinc-400">Open WebUI role</p>
-                    </div>
-                    <select
-                      value={roleAssignment?.policy_id || ''}
-                      onChange={(e) => handleAssignmentChange('role', role, e.target.value)}
-                      className="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 max-w-[140px]"
+            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-100">
+                <h3 className="text-sm font-semibold text-zinc-900">Group Assignments</h3>
+                <p className="text-xs text-zinc-400">Medium priority</p>
+              </div>
+              <div className="divide-y divide-zinc-50">
+                {groups.map((group) => {
+                  const groupAssignment = assignments.find(
+                    (a) => a.entity_type === 'group' && a.entity_id === group.id
+                  );
+                  return (
+                    <div
+                      key={group.id}
+                      className="px-5 py-3 flex items-center justify-between gap-2 transition-colors"
+                      onDragOver={(e: DragEvent) => { e.preventDefault(); e.currentTarget.classList.add('bg-teal-50'); }}
+                      onDragLeave={(e: DragEvent) => { e.currentTarget.classList.remove('bg-teal-50'); }}
+                      onDrop={(e: DragEvent) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('bg-teal-50');
+                        const policyId = e.dataTransfer.getData('application/x-policy-id');
+                        if (policyId) handleAssignmentChange('group', group.id, policyId);
+                      }}
                     >
-                      <option value="">None</option>
-                      {policies.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-zinc-900 truncate">{group.name}</p>
+                        <p className="text-[11px] text-zinc-400">{group.description}</p>
+                      </div>
+                      <select
+                        value={groupAssignment?.policy_id || group.policy_id || ''}
+                        onChange={(e) => handleAssignmentChange('group', group.id, e.target.value)}
+                        className="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 max-w-[140px]"
+                      >
+                        <option value="">None</option>
+                        {policies.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-100">
+                <h3 className="text-sm font-semibold text-zinc-900">Role Defaults</h3>
+                <p className="text-xs text-zinc-400">Lowest priority</p>
+              </div>
+              <div className="divide-y divide-zinc-50">
+                {['admin', 'user', 'pending'].map((role) => {
+                  const roleAssignment = assignments.find(
+                    (a) => a.entity_type === 'role' && a.entity_id === role
+                  );
+                  return (
+                    <div
+                      key={role}
+                      className="px-5 py-3 flex items-center justify-between gap-2 transition-colors"
+                      onDragOver={(e: DragEvent) => { e.preventDefault(); e.currentTarget.classList.add('bg-teal-50'); }}
+                      onDragLeave={(e: DragEvent) => { e.currentTarget.classList.remove('bg-teal-50'); }}
+                      onDrop={(e: DragEvent) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('bg-teal-50');
+                        const policyId = e.dataTransfer.getData('application/x-policy-id');
+                        if (policyId) handleAssignmentChange('role', role, policyId);
+                      }}
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-zinc-900 capitalize">{role}</p>
+                        <p className="text-[11px] text-zinc-400">Open WebUI role</p>
+                      </div>
+                      <select
+                        value={roleAssignment?.policy_id || ''}
+                        onChange={(e) => handleAssignmentChange('role', role, e.target.value)}
+                        className="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 max-w-[140px]"
+                      >
+                        <option value="">None</option>
+                        {policies.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

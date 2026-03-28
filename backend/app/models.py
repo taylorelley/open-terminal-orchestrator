@@ -130,6 +130,16 @@ class AuditLogEntry(Base):
     sandbox: Mapped["Sandbox | None"] = relationship(lazy="selectin")
 
 
+class MetricSnapshot(Base):
+    __tablename__ = "metric_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    metric_type: Mapped[str] = mapped_column(Text, nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+
+
 class SystemConfig(Base):
     __tablename__ = "system_config"
 

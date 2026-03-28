@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import async_session
-from app.models import Sandbox, SystemConfig
+from app.models import MetricSnapshot, Sandbox, SystemConfig
 from app.services import openshell_client
 from app.services.audit_service import log_lifecycle
 
@@ -315,6 +315,39 @@ async def _recreate_pending(db: AsyncSession, cfg: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Metric snapshots
+# ---------------------------------------------------------------------------
+
+
+async def _record_metric_snapshots(db: AsyncSession) -> None:
+    """Record aggregate resource metrics for historical charts."""
+    now = datetime.now(timezone.utc)
+
+    # CPU average
+    cpu_result = await db.execute(
+        select(func.avg(Sandbox.cpu_usage)).where(Sandbox.state.in_(["ACTIVE", "READY"]))
+    )
+    cpu_avg = cpu_result.scalar_one_or_none() or 0
+
+    # Memory average
+    mem_result = await db.execute(
+        select(func.avg(Sandbox.memory_usage)).where(Sandbox.state.in_(["ACTIVE", "READY"]))
+    )
+    mem_avg = mem_result.scalar_one_or_none() or 0
+
+    for metric_type, value in [("cpu", float(cpu_avg)), ("memory", float(mem_avg))]:
+        db.add(MetricSnapshot(
+            id=uuid.uuid4(),
+            timestamp=now,
+            metric_type=metric_type,
+            value=value,
+            metadata_={},
+        ))
+
+    await db.flush()
+
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
@@ -332,6 +365,7 @@ async def _run_cycle() -> None:
             await _suspend_idle(db, cfg)
             await _replenish_pool(db, cfg)
             await _health_checks(db)
+            await _record_metric_snapshots(db)
 
             await db.commit()
         except Exception:

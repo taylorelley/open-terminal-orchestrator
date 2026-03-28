@@ -21,11 +21,13 @@ from app.routes.proxy import router as proxy_router
 from app.routes.sandboxes import router as sandboxes_router
 from app.routes.system import router as system_router
 from app.routes.auth import router as auth_router
+from app.routes.metrics_history import router as metrics_history_router
 from app.routes.users import router as users_router
 from app.services.audit_service import audit_retention_manager
 from app.services.pool_manager import pool_manager
 from app.services.proxy_client import close_client, init_client
 from app.services.syslog_service import syslog_service
+from app.services.alert_evaluator import alert_evaluator
 from app.services.webhook_service import webhook_service
 
 logger = logging.getLogger(__name__)
@@ -48,9 +50,11 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     await syslog_service.start()
     await pool_manager.start()
     await audit_retention_manager.start()
+    await alert_evaluator.start()
 
     yield
 
+    await alert_evaluator.stop()
     await audit_retention_manager.stop()
     await pool_manager.stop()
     await syslog_service.stop()
@@ -81,6 +85,7 @@ app.include_router(sandboxes_router)
 app.include_router(policies_router)
 app.include_router(users_router)
 app.include_router(system_router)
+app.include_router(metrics_history_router)
 
 # Root-level metrics endpoint for Prometheus scraping (optional token auth).
 @app.get("/metrics", tags=["metrics"])

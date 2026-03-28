@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shellguard
+  namespace: shellguard
+  labels:
+    app.kubernetes.io/name: shellguard
+    app.kubernetes.io/component: server
+  annotations:
+    # cert-manager: uncomment and set issuer name to enable automatic TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - shellguard.example.com
+      secretName: shellguard-tls
+  rules:
+    - host: shellguard.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shellguard
+                port:
+                  number: 8080
