@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     audit_retention_days: int = 90
     audit_retention_interval: int = 86400  # 24 hours
 
+    # Authentication
+    auth_method: str = "local"  # "local" | "oidc" | "both"
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    oidc_redirect_uri: str = ""
+    oidc_scopes: str = "openid email profile"
+    oidc_session_secret: str = ""  # secret for signing session JWTs; auto-generated if empty
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8080

@@ -11,7 +11,7 @@ import Monitoring from './pages/Monitoring';
 import Settings from './pages/Settings';
 
 function ProtectedRoutes() {
-  const { session, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
@@ -21,7 +21,7 @@ function ProtectedRoutes() {
     );
   }
 
-  if (!session) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   return (
     <Routes>
@@ -39,7 +39,7 @@ function ProtectedRoutes() {
 }
 
 function AppRoutes() {
-  const { session, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
@@ -51,7 +51,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={session ? <Navigate to="/admin" replace /> : <Login />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/admin" replace /> : <Login />} />
       <Route path="/admin/*" element={<ProtectedRoutes />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>

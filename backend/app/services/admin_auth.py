@@ -58,6 +58,23 @@ async def _load_stored_keys(db: AsyncSession) -> list[dict]:
     return row.value.get("keys", [])
 
 
+def _check_oidc_session(request: Request) -> bool:
+    """Check for a valid OIDC session cookie. Returns True if valid."""
+    from app.services.oidc import oidc_client
+
+    if settings.auth_method not in ("oidc", "both"):
+        return False
+    if not oidc_client.is_configured:
+        return False
+
+    session_cookie = request.cookies.get("sg_session", "")
+    if not session_cookie:
+        return False
+
+    user_info = oidc_client.verify_session_token(session_cookie)
+    return user_info is not None
+
+
 async def require_admin(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -65,8 +82,13 @@ async def require_admin(
     """FastAPI dependency that enforces admin authentication.
 
     Raises ``HTTPException(401)`` if no valid credential is provided.
+    Accepts API keys (always) and OIDC session cookies (when configured).
     In dev/bootstrap mode (no keys configured at all), access is allowed.
     """
+    # Check OIDC session cookie first (if configured).
+    if _check_oidc_session(request):
+        return
+
     # Extract credential from request.
     token = _extract_bearer_token(request)
     api_key_header = request.headers.get("X-Admin-API-Key")
@@ -79,7 +101,7 @@ async def require_admin(
     else:
         # No env key set — check if stored keys exist.
         stored_keys = await _load_stored_keys(db)
-        if not stored_keys:
+        if not stored_keys and settings.auth_method == "local":
             # Dev/bootstrap mode: no auth configured at all.
             return
         if credential:
@@ -88,7 +110,7 @@ async def require_admin(
                 if secrets.compare_digest(hashed, key_entry.get("hash", "")):
                     return
 
-        raise HTTPException(status_code=401, detail="Invalid or missing admin API key")
+        raise HTTPException(status_code=401, detail="Invalid or missing admin credential")
 
     # Env key is set but credential didn't match — also check stored keys.
     if credential:
@@ -98,7 +120,7 @@ async def require_admin(
             if secrets.compare_digest(hashed, key_entry.get("hash", "")):
                 return
 
-    raise HTTPException(status_code=401, detail="Invalid or missing admin API key")
+    raise HTTPException(status_code=401, detail="Invalid or missing admin credential")
 
 
 # ---------------------------------------------------------------------------

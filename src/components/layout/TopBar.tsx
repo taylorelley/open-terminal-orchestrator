@@ -15,7 +15,7 @@ const routeTitles: Record<string, string> = {
 
 export function TopBar() {
   const { pathname } = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, oidcSession, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -52,14 +52,14 @@ export function TopBar() {
               <User className="w-3.5 h-3.5 text-zinc-600" />
             </div>
             <span className="text-sm font-medium text-zinc-700 hidden sm:block">
-              {user?.email?.split('@')[0] || 'Admin'}
+              {oidcSession?.name || user?.email?.split('@')[0] || 'Admin'}
             </span>
           </button>
 
           {menuOpen && (
             <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-zinc-200 py-1 z-50">
               <div className="px-3 py-2 border-b border-zinc-100">
-                <p className="text-xs text-zinc-500 truncate">{user?.email}</p>
+                <p className="text-xs text-zinc-500 truncate">{oidcSession?.email || user?.email}</p>
               </div>
               <button
                 onClick={() => { signOut(); setMenuOpen(false); }}
