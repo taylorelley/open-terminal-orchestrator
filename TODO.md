@@ -131,8 +131,8 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 - [x] YAML editor schema validation (frontend wired to backend validation endpoint)
 - [x] Policy diff view between versions (UI + backend diff endpoint integrated)
-- [ ] Real-time streaming mode for audit log (Supabase realtime partially wired)
-- [ ] Saved filter presets for audit log
+- [x] Real-time streaming mode for audit log (Supabase realtime fully wired)
+- [x] Saved filter presets for audit log
 - [ ] Threshold alerts configuration in monitoring
 - [ ] Terminal embed in sandbox detail panel (operator debugging)
 - [ ] Drag-and-drop policy assignment

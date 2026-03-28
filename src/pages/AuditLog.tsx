@@ -8,14 +8,19 @@ import {
   Calendar,
   Radio,
   Circle,
+  Bookmark,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSupabaseRealtime } from '../hooks/useSupabaseQuery';
+import { useFilterPresets } from '../hooks/useFilterPresets';
 import { Tabs } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
 import { LoadingState, EmptyState } from '../components/ui/EmptyState';
 import { formatTimestamp } from '../lib/utils';
-import type { AuditLogEntry, AuditCategory } from '../types';
+import type { AuditLogEntry, AuditCategory, AuditFilterPreset } from '../types';
 
 const DATE_PRESETS = [
   { label: 'Last hour', ms: 3600000 },
@@ -39,6 +44,14 @@ export default function AuditLog() {
   const listTopRef = useRef<HTMLDivElement>(null);
   const newIdTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const isScrolledToTopRef = useRef(true);
+
+  const { presets, savePreset, deletePreset } = useFilterPresets();
+  const [presetDropdownOpen, setPresetDropdownOpen] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  const presetDropdownRef = useRef<HTMLDivElement>(null);
+  const applyingPresetRef = useRef(false);
 
   const isPaused = expandedId !== null || search.length > 0;
 
@@ -192,6 +205,56 @@ export default function AuditLog() {
     };
   }, []);
 
+  // Clear activePresetId when filters change manually
+  useEffect(() => {
+    if (applyingPresetRef.current) {
+      applyingPresetRef.current = false;
+      return;
+    }
+    setActivePresetId(null);
+  }, [activeTab, datePreset, search]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!presetDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (presetDropdownRef.current && !presetDropdownRef.current.contains(e.target as Node)) {
+        setPresetDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [presetDropdownOpen]);
+
+  const handleApplyPreset = (preset: AuditFilterPreset) => {
+    applyingPresetRef.current = true;
+    const dateIndex = DATE_PRESETS.findIndex((p) => p.ms === preset.datePresetMs);
+    setActiveTab(preset.category);
+    setDatePreset(dateIndex >= 0 ? dateIndex : 0);
+    setSearch(preset.search);
+    setActivePresetId(preset.id);
+    setPresetDropdownOpen(false);
+  };
+
+  const handleSavePreset = () => {
+    if (!presetName.trim()) return;
+    savePreset({
+      name: presetName.trim(),
+      category: activeTab,
+      datePresetMs: DATE_PRESETS[datePreset].ms,
+      search,
+    });
+    setPresetName('');
+    setSaveModalOpen(false);
+  };
+
+  const handleDeletePreset = (id: string) => {
+    deletePreset(id);
+    if (activePresetId === id) setActivePresetId(null);
+  };
+
+  const activePresetName = presets.find((p) => p.id === activePresetId)?.name;
+
   const filtered = entries.filter((e) => {
     if (!search) return true;
     const s = search.toLowerCase();
@@ -252,6 +315,67 @@ export default function AuditLog() {
       />
 
       <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative" ref={presetDropdownRef}>
+          <button
+            onClick={() => setPresetDropdownOpen((prev) => !prev)}
+            className={`px-3 py-2 text-xs font-medium rounded-lg border transition-colors flex items-center gap-1.5 ${
+              activePresetId
+                ? 'bg-teal-50 text-teal-700 border-teal-200'
+                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+            }`}
+          >
+            <Bookmark className="w-3 h-3" />
+            {activePresetName || 'Presets'}
+            <ChevronDown className="w-3 h-3" />
+          </button>
+          {presetDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1 z-20 w-64 bg-white border border-zinc-200 rounded-lg shadow-lg overflow-hidden">
+              {presets.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-zinc-400 text-center">No saved presets</div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto divide-y divide-zinc-50">
+                  {presets.map((preset) => (
+                    <div
+                      key={preset.id}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 cursor-pointer group"
+                      onClick={() => handleApplyPreset(preset)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-zinc-700 truncate">{preset.name}</div>
+                        <div className="text-[11px] text-zinc-400 truncate">
+                          {preset.category} / {DATE_PRESETS.find((p) => p.ms === preset.datePresetMs)?.label || 'Custom'}
+                          {preset.search && ` / "${preset.search}"`}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePreset(preset.id);
+                        }}
+                        className="p-1 rounded text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="border-t border-zinc-100">
+                <button
+                  onClick={() => {
+                    setPresetDropdownOpen(false);
+                    setSaveModalOpen(true);
+                  }}
+                  className="w-full px-3 py-2 text-xs text-teal-600 hover:bg-teal-50 transition-colors flex items-center gap-1.5"
+                >
+                  <Plus className="w-3 h-3" />
+                  Save current filters...
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
           <input
@@ -463,6 +587,49 @@ export default function AuditLog() {
         <span>Showing {filtered.length} events</span>
         <span>{DATE_PRESETS[datePreset].label} window</span>
       </div>
+
+      <Modal
+        open={saveModalOpen}
+        onClose={() => { setSaveModalOpen(false); setPresetName(''); }}
+        title="Save Filter Preset"
+        actions={
+          <>
+            <button
+              onClick={() => { setSaveModalOpen(false); setPresetName(''); }}
+              className="px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSavePreset}
+              disabled={!presetName.trim()}
+              className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Save
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">Preset name</label>
+            <input
+              type="text"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSavePreset(); }}
+              placeholder="e.g. Recent denials"
+              autoFocus
+              className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
+            />
+          </div>
+          <div className="bg-zinc-50 rounded-lg px-3 py-2 text-xs text-zinc-500 space-y-1">
+            <div><span className="font-medium text-zinc-600">Category:</span> {activeTab}</div>
+            <div><span className="font-medium text-zinc-600">Date range:</span> {DATE_PRESETS[datePreset].label}</div>
+            <div><span className="font-medium text-zinc-600">Search:</span> {search || '(none)'}</div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
