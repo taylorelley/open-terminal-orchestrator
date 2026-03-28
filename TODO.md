@@ -141,11 +141,11 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 9. BYOC Sandbox Image — P1 (PRD Section 5.3)
 
-- [ ] Create `shellguard-sandbox/Dockerfile` (slim variant from `open-terminal:slim`)
-- [ ] Add health check (`curl -sf http://localhost:8000/health`)
-- [ ] Create `shellguard-sandbox/Dockerfile.full` (full variant from `open-terminal:latest`)
-- [ ] Register image with OpenShell as local BYOC source
-- [ ] Document image customization for additional tooling
+- [x] Create `shellguard-sandbox/Dockerfile` (slim variant from `open-terminal:slim`)
+- [x] Add health check (`curl -sf http://localhost:8000/health`)
+- [x] Create `shellguard-sandbox/Dockerfile.full` (full variant from `open-terminal:latest`)
+- [x] Register image with OpenShell as local BYOC source
+- [x] Document image customization for additional tooling
 
 ## 10. Integrations — P2 (PRD Section 12)
 
