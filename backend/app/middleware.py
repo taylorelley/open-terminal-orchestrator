@@ -1,5 +1,6 @@
-"""CORS configuration and request-ID middleware."""
+"""CORS configuration, request-ID middleware, and Prometheus instrumentation."""
 
+import time
 import uuid
 
 from fastapi import FastAPI, Request, Response
@@ -18,6 +19,29 @@ def configure_cors(app: FastAPI) -> None:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+class PrometheusMiddleware(BaseHTTPMiddleware):
+    """Record HTTP request count and latency as Prometheus metrics."""
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        from app.metrics import REQUEST_COUNT, REQUEST_LATENCY
+
+        method = request.method
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration = time.perf_counter() - start
+
+        # Use the route path template (e.g. "/admin/api/sandboxes/{id}")
+        # to avoid label cardinality explosion from path parameters.
+        route = request.scope.get("route")
+        path = route.path if route and hasattr(route, "path") else request.url.path
+        status = str(response.status_code)
+
+        REQUEST_COUNT.labels(method=method, path=path, status=status).inc()
+        REQUEST_LATENCY.labels(method=method, path=path).observe(duration)
+
+        return response
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):

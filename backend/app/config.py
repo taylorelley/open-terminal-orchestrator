@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: list[str] = ["*"]
 
+    # Metrics
+    metrics_token: str = ""
+
     # Frontend
     frontend_dist_path: str = "../dist"
 

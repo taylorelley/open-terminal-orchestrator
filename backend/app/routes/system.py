@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -246,9 +246,15 @@ def _export_csv(rows: list[AuditLogEntry]) -> StreamingResponse:
 
 
 @router.get("/metrics")
-async def get_metrics():
-    """Placeholder — Prometheus-format metrics to be implemented."""
-    return {"status": "pending", "message": "Prometheus metrics export not yet implemented"}
+async def get_metrics(db: AsyncSession = Depends(get_db)):
+    """Export Prometheus-format metrics (admin-authed)."""
+    from app.metrics import collect_db_gauges, generate_metrics_output
+
+    await collect_db_gauges(db)
+    return PlainTextResponse(
+        content=generate_metrics_output(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 # ---------------------------------------------------------------------------
