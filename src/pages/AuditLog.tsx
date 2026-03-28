@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileText,
   Search,
@@ -8,6 +8,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useSupabaseRealtime } from '../hooks/useSupabaseQuery';
 import { Tabs } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { LoadingState, EmptyState } from '../components/ui/EmptyState';
@@ -69,6 +70,44 @@ export default function AuditLog() {
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
+
+  // Keep refs for realtime callback so it always sees current filter state
+  const activeTabRef = useRef(activeTab);
+  const datePresetRef = useRef(datePreset);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+  useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
+
+  const handleRealtimeInsert = useCallback((entry: AuditLogEntry) => {
+    if (!entry || !entry.id) return;
+
+    // Only prepend if the entry matches the active category
+    if (entry.category !== activeTabRef.current) {
+      // Still update counts for other categories
+      setCounts((prev) => ({
+        ...prev,
+        [entry.category]: (prev[entry.category] || 0) + 1,
+      }));
+      return;
+    }
+
+    // Check if entry falls within the current date range
+    const since = Date.now() - DATE_PRESETS[datePresetRef.current].ms;
+    if (new Date(entry.timestamp).getTime() < since) return;
+
+    // Prepend, deduplicating by id
+    setEntries((prev) => {
+      if (prev.some((e) => e.id === entry.id)) return prev;
+      return [entry, ...prev].slice(0, 200);
+    });
+
+    // Update count for active category
+    setCounts((prev) => ({
+      ...prev,
+      [entry.category]: (prev[entry.category] || 0) + 1,
+    }));
+  }, []);
+
+  useSupabaseRealtime<AuditLogEntry>('audit_log', handleRealtimeInsert);
 
   const filtered = entries.filter((e) => {
     if (!search) return true;
