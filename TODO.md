@@ -15,81 +15,48 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | Database Schema (Section 10) | 100% | All tables, RLS, indexes, metric_snapshots in place |
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
-| Management API (Section 9.2) | 100% | All CRUD endpoints + bulk actions + metrics history + alerts implemented |
-| Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff all implemented |
+| Management API (Section 9.2) | ~90% | Core CRUD + bulk + metrics + alerts done; some granular PRD endpoints missing |
+| Policy Engine (Section 7) | ~95% | Resolution, validation, application, hot-reload, recreation, diff done; dry-run not implemented |
 | Sandbox Lifecycle (Section 6) | 100% | Pool manager, openshell client, lifecycle automation, metric snapshots implemented |
-| Integrations (Section 12) | ~70% | LiteLLM, Prometheus, webhooks, syslog done; Open WebUI/OpenShell CLI remaining |
+| Integrations (Section 12) | ~85% | Open WebUI, OpenShell CLI, LiteLLM, Prometheus, webhooks, syslog done; `policy get`, `provider create`, OTel, Grafana remaining |
+| Testing (Section 12) | ~85% | Backend pytest comprehensive (19 files); frontend Vitest not started |
 | Deployment (Section 13) | 100% | Docker Compose, K3s, Alembic, TLS guide all done |
+| Documentation (Section 13) | 100% | Architecture, deployment, policy, API, runbook, contributing all done |
 
 ---
 
-## Next Steps — Prioritized Phases
+## Remaining Work
 
-The remaining ~20 items are organized into 5 phases based on dependencies and impact.
-Phases 2 and 3 can run in parallel. Phase 4 follows 1-2. Phase 5 follows 3-4.
+~10 items remain, organized by priority. All items are independent unless noted.
 
-### Phase 1: Backend Event Infrastructure (P1 — do first)
+### P1 — Integration Gaps
 
-Unblocks alerting, observability, and SIEM compliance. No frontend dependencies.
+| # | Item | Section | Notes |
+|---|------|---------|-------|
+| R1 | `openshell policy get` — add `get_policy()` to `openshell_client.py` | §12.2 | `policy set` exists; `get` not implemented |
+| R2 | `openshell provider create` — credential injection via OpenShell providers | §12.2, §11.3 | Credential flow described in PRD but not implemented |
 
-| # | Item | Depends On | Section |
-|---|------|-----------|---------|
-| 1A | Webhook notifications for lifecycle events — create `webhook_service.py`, hook into `audit_service.py`, add webhook CRUD to system routes | — | §10 |
-| 1B | Syslog/SIEM forwarding — create `syslog_service.py` (RFC 5424, TCP/UDP), hook into audit service | — | §10 |
-| 1C | Prometheus metrics hardening — add histogram buckets for sandbox startup latency, pool utilization gauges, webhook delivery counters | 1A (partial) | §10 |
-| 1D | LiteLLM Proxy inference routing — add `/v1/chat/completions`, `/v1/completions`, `/v1/models` routes in `proxy.py`, reuse `sandbox_resolver` | — | §10 |
+### P2 — API Completeness (PRD §9.2)
 
-1A and 1B are independent. 1C depends partially on 1A. 1D is fully independent.
+| # | Item | Section | Notes |
+|---|------|---------|-------|
+| R3 | `POST /admin/api/policies/{id}/dry-run` — test policy against OpenShell without applying | §9.2 | Validate endpoint exists; dry-run does not |
+| R4 | `GET /admin/api/policies/{id}/versions/{v}` — get specific version | §9.2 | Version list exists; individual version fetch does not |
+| R5 | `GET /admin/api/policies/resolve/{uid}` — resolve effective policy for user | §9.2 | Policy engine has resolution logic; no dedicated endpoint |
+| R6 | `PUT /admin/api/groups/{id}/members` — set group membership | §9.2 | Group CRUD exists; dedicated members endpoint does not |
 
-### Phase 2: Frontend Enhancements (P2 — after Phase 1A)
+### P2 — Observability (PRD §12.5)
 
-Operator-facing improvements. The monitoring page currently uses generated fake data.
+| # | Item | Section | Notes |
+|---|------|---------|-------|
+| R7 | OpenTelemetry trace propagation — propagate trace context from Open WebUI through orchestrator to sandbox | §12.5 | Not started |
+| R8 | Grafana dashboard template — pre-built dashboard for ShellGuard Prometheus metrics | §12.5 | Not started |
 
-| # | Item | Depends On | Section |
-|---|------|-----------|---------|
-| 2A | Historical trend selector (1h/24h/7d/30d) — replace `generateTimeSeries` in `Monitoring.tsx` with real data, add backend `GET /admin/api/metrics/history` | — | §8 |
-| 2B | Bulk actions on sandbox table — add checkbox column + toolbar in `Sandboxes.tsx`, add `POST /admin/api/sandboxes/bulk` endpoint | — | §8 |
-| 2C | Threshold alerts configuration — add "Alerts" tab to Monitoring, store in `system_config`, fire via webhooks | Phase 1A | §8 |
-| 2D | Terminal embed in sandbox detail panel — add xterm.js, WebSocket to sandbox Open Terminal, gate behind "Open Terminal" button | — | §8 |
-| 2E | Drag-and-drop policy assignment — add drag API to `Policies.tsx` assignments tab | — | §8 |
+### P2 — Testing
 
-2A, 2B, 2D, 2E are independent. 2C depends on Phase 1A (webhooks).
-
-### Phase 3: Deployment Hardening (P2 — parallel with Phase 2)
-
-Production-readiness for non-Docker-Compose environments.
-
-| # | Item | Depends On | Section |
-|---|------|-----------|---------|
-| 3A | Database migration scripts — convert Supabase SQL to Alembic, add `alembic upgrade head` to Docker entrypoint | — | §11 |
-| 3B | Kubernetes/K3s manifests — `deploy/k3s/` with namespace, deployment, service, ingress, configmap, secrets, PVCs | 3A (referenced) | §11 |
-| 3C | TLS/reverse proxy configuration guide — nginx, Caddy, Traefik sample configs for TLS termination | — | §11 |
-
-### Phase 4: Testing (P2 — after Phases 1-2)
-
-Build confidence before production deployment.
-
-| # | Item | Depends On | Section |
-|---|------|-----------|---------|
-| 4A | End-to-end test — `test_e2e_flow.py`: user request → sandbox provision → command execution → response, plus error paths (no pool, sandbox suspended) | Phases 1-2 | §12 |
-| 4B | Frontend component tests — add Vitest + React Testing Library, cover Sandboxes, Policies, Monitoring pages | Phase 2 | §12 |
-
-4A and 4B are independent of each other.
-
-### Phase 5: Documentation (P3 — after Phases 3-4)
-
-Make the project approachable for operators and contributors, ordered by value.
-
-| # | Item | Depends On | Section |
-|---|------|-----------|---------|
-| 5A | Deployment guide (Docker Compose + K3s) | Phase 3 | §13 |
-| 5B | API reference (OpenAPI/Swagger) — enhance FastAPI route descriptions and response examples | — | §13 |
-| 5C | Policy authoring guide — YAML format, tier system, assignment precedence, examples | — | §13 |
-| 5D | Architecture overview with diagrams | — | §13 |
-| 5E | Operator runbook — troubleshooting, backup/restore | — | §13 |
-| 5F | Contributing guide — dev setup, test commands, PR process | — | §13 |
-
-All items are independent. 5A should come after Phase 3 artifacts exist.
+| # | Item | Section | Notes |
+|---|------|---------|-------|
+| R9 | Frontend component tests — add Vitest + React Testing Library, cover Sandboxes, Policies, Monitoring pages | §8 | No test framework, files, or dependencies configured |
 
 ---
 
@@ -138,7 +105,7 @@ All items are independent. 5A should come after Phase 3 artifacts exist.
 - [x] Apply policy at sandbox creation via `openshell policy set`
 - [x] Hot-reload dynamic policy sections (network, inference) on running sandboxes
 - [x] Schedule sandbox recreation for static policy changes (filesystem, process)
-- [x] Dry-run / validate policy against OpenShell without applying
+- [-] Dry-run / validate policy against OpenShell without applying — validate endpoint exists; dedicated dry-run endpoint not implemented (R3)
 - [x] Policy diff view between versions (backend support)
 
 ## 5. Audit Logger — P1 (PRD Section 5.2, 8.7)
@@ -172,8 +139,11 @@ All items are independent. 5A should come after Phase 3 artifacts exist.
 - [x] `DELETE /admin/api/policies/{id}` — delete policy
 - [x] `GET /admin/api/policies/{id}/versions` — version history
 - [x] `POST /admin/api/policies/{id}/validate` — YAML schema validation
+- [ ] `POST /admin/api/policies/{id}/dry-run` — test policy against OpenShell (R3)
 - [x] `GET /admin/api/policies/assignments` — list all assignments
 - [x] `PUT /admin/api/policies/assignments` — update assignments
+- [ ] `GET /admin/api/policies/{id}/versions/{v}` — get specific version (R4)
+- [ ] `GET /admin/api/policies/resolve/{uid}` — resolve effective policy for user (R5)
 
 ### Users & Groups
 - [x] `POST /admin/api/users/sync` — sync users from Open WebUI
@@ -182,6 +152,7 @@ All items are independent. 5A should come after Phase 3 artifacts exist.
 - [x] `POST /admin/api/groups` — create group
 - [x] `PUT /admin/api/groups/{id}` — update group
 - [x] `DELETE /admin/api/groups/{id}` — delete group
+- [ ] `PUT /admin/api/groups/{id}/members` — set group membership (R6)
 
 ### System
 - [x] `GET /admin/api/health` — detailed health status
@@ -219,13 +190,16 @@ All items are independent. 5A should come after Phase 3 artifacts exist.
 
 ## 10. Integrations — P2 (PRD Section 12)
 
-- [ ] Open WebUI integration (backend proxy mode, user ID extraction)
-- [ ] OpenShell CLI integration (`openshell sandbox create/suspend/resume/destroy`)
-- [ ] OpenShell policy management (`openshell policy set/get`)
+- [x] Open WebUI integration (backend proxy mode, `X-Open-WebUI-User-Id` extraction, `X-API-Key` validation)
+- [x] OpenShell CLI sandbox lifecycle (`openshell sandbox create/suspend/resume/destroy` via `openshell_client.py`)
+- [-] OpenShell policy management — `policy set` done; `policy get` not implemented (R1)
+- [ ] OpenShell credential injection — `openshell provider create` not implemented (R2)
 - [x] LiteLLM Proxy inference routing (intercept and redirect model API calls)
 - [x] Prometheus metrics export endpoint (hardened with startup histograms, pool utilization, webhook counters)
 - [x] Webhook notifications for lifecycle events
 - [x] Syslog/SIEM forwarding for audit events
+- [ ] OpenTelemetry trace propagation (R7)
+- [ ] Grafana dashboard template for Prometheus metrics (R8)
 
 ## 11. Deployment — P2 (PRD Section 13)
 
