@@ -94,6 +94,15 @@ export interface AuditLogEntry {
   sandbox?: Sandbox | null;
 }
 
+export interface AuditFilterPreset {
+  id: string;
+  name: string;
+  category: AuditCategory;
+  datePresetMs: number;
+  search: string;
+  createdAt: string;
+}
+
 export interface SystemConfig {
   key: string;
   value: Record<string, unknown>;
