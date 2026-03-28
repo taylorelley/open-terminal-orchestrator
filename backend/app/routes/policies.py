@@ -93,6 +93,107 @@ async def create_policy(
     return policy
 
 
+# ---------------------------------------------------------------------------
+# Inline validation (no policy_id) — must be registered before {policy_id}
+# ---------------------------------------------------------------------------
+
+
+@router.post("/policies/validate")
+async def validate_policy_inline(body: dict):
+    """Validate arbitrary policy YAML without requiring a saved policy."""
+    yaml_str = body.get("yaml", "")
+    if not yaml_str:
+        return {"valid": False, "errors": ["No YAML provided"]}
+    valid, errors = validate_policy_yaml(yaml_str)
+    return {"valid": valid, "errors": errors}
+
+
+# ---------------------------------------------------------------------------
+# Policy Assignments — must be registered before {policy_id} routes
+# ---------------------------------------------------------------------------
+
+
+@router.get("/policies/assignments", response_model=list[PolicyAssignmentResponse])
+async def list_assignments(
+    entity_type: str | None = Query(None),
+    entity_id: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(PolicyAssignment)
+    if entity_type:
+        query = query.where(PolicyAssignment.entity_type == entity_type)
+    if entity_id:
+        query = query.where(PolicyAssignment.entity_id == entity_id)
+    query = query.order_by(PolicyAssignment.priority.desc())
+
+    rows = (await db.execute(query)).scalars().all()
+    return rows
+
+
+@router.put("/policies/assignments", response_model=PolicyAssignmentResponse)
+async def upsert_assignment(
+    request: Request,
+    body: PolicyAssignmentCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    # Check for existing assignment with same entity
+    existing = (
+        await db.execute(
+            select(PolicyAssignment).where(
+                PolicyAssignment.entity_type == body.entity_type,
+                PolicyAssignment.entity_id == body.entity_id,
+            )
+        )
+    ).scalar_one_or_none()
+
+    now = datetime.now(timezone.utc)
+    source_ip = request.client.host if request.client else ""
+
+    if existing:
+        existing.policy_id = body.policy_id
+        existing.priority = body.priority
+        log_admin(
+            db, "policy_change",
+            details={
+                "action": "assignment_updated",
+                "entity_type": body.entity_type,
+                "entity_id": body.entity_id,
+                "policy_id": str(body.policy_id),
+            },
+            source_ip=source_ip,
+        )
+        await db.flush()
+        await db.refresh(existing)
+        return existing
+
+    assignment = PolicyAssignment(
+        entity_type=body.entity_type,
+        entity_id=body.entity_id,
+        policy_id=body.policy_id,
+        priority=body.priority,
+        created_at=now,
+    )
+    db.add(assignment)
+    log_admin(
+        db, "policy_change",
+        details={
+            "action": "assignment_created",
+            "entity_type": body.entity_type,
+            "entity_id": body.entity_id,
+            "policy_id": str(body.policy_id),
+        },
+        source_ip=source_ip,
+    )
+    await db.flush()
+    await db.refresh(assignment)
+    return assignment
+
+
+# ---------------------------------------------------------------------------
+# Per-policy routes (parameterised by {policy_id})
+# ---------------------------------------------------------------------------
+
+
 @router.get("/policies/{policy_id}", response_model=PolicyResponse)
 async def get_policy(
     policy_id: uuid.UUID,
@@ -271,16 +372,6 @@ async def diff_policy_versions(
     )
 
 
-@router.post("/policies/validate")
-async def validate_policy_inline(body: dict):
-    """Validate arbitrary policy YAML without requiring a saved policy."""
-    yaml_str = body.get("yaml", "")
-    if not yaml_str:
-        return {"valid": False, "errors": ["No YAML provided"]}
-    valid, errors = validate_policy_yaml(yaml_str)
-    return {"valid": valid, "errors": errors}
-
-
 @router.post("/policies/{policy_id}/validate")
 async def validate_policy(
     policy_id: uuid.UUID,
@@ -296,83 +387,3 @@ async def validate_policy(
     valid, errors = validate_policy_yaml(row.yaml)
     return {"valid": valid, "errors": errors}
 
-
-# ---------------------------------------------------------------------------
-# Policy Assignments
-# ---------------------------------------------------------------------------
-
-
-@router.get("/policies/assignments", response_model=list[PolicyAssignmentResponse])
-async def list_assignments(
-    entity_type: str | None = Query(None),
-    entity_id: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
-):
-    query = select(PolicyAssignment)
-    if entity_type:
-        query = query.where(PolicyAssignment.entity_type == entity_type)
-    if entity_id:
-        query = query.where(PolicyAssignment.entity_id == entity_id)
-    query = query.order_by(PolicyAssignment.priority.desc())
-
-    rows = (await db.execute(query)).scalars().all()
-    return rows
-
-
-@router.put("/policies/assignments", response_model=PolicyAssignmentResponse)
-async def upsert_assignment(
-    request: Request,
-    body: PolicyAssignmentCreate,
-    db: AsyncSession = Depends(get_db),
-):
-    # Check for existing assignment with same entity
-    existing = (
-        await db.execute(
-            select(PolicyAssignment).where(
-                PolicyAssignment.entity_type == body.entity_type,
-                PolicyAssignment.entity_id == body.entity_id,
-            )
-        )
-    ).scalar_one_or_none()
-
-    now = datetime.now(timezone.utc)
-    source_ip = request.client.host if request.client else ""
-
-    if existing:
-        existing.policy_id = body.policy_id
-        existing.priority = body.priority
-        log_admin(
-            db, "policy_change",
-            details={
-                "action": "assignment_updated",
-                "entity_type": body.entity_type,
-                "entity_id": body.entity_id,
-                "policy_id": str(body.policy_id),
-            },
-            source_ip=source_ip,
-        )
-        await db.flush()
-        await db.refresh(existing)
-        return existing
-
-    assignment = PolicyAssignment(
-        entity_type=body.entity_type,
-        entity_id=body.entity_id,
-        policy_id=body.policy_id,
-        priority=body.priority,
-        created_at=now,
-    )
-    db.add(assignment)
-    log_admin(
-        db, "policy_change",
-        details={
-            "action": "assignment_created",
-            "entity_type": body.entity_type,
-            "entity_id": body.entity_id,
-            "policy_id": str(body.policy_id),
-        },
-        source_ip=source_ip,
-    )
-    await db.flush()
-    await db.refresh(assignment)
-    return assignment
