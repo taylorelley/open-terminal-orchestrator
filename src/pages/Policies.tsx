@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Shield,
   Plus,
@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Search,
   ArrowLeft,
+  AlertTriangle,
+  CheckCircle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Tabs } from '../components/ui/Tabs';
@@ -35,6 +37,14 @@ export default function Policies() {
   const [selectedVersionPolicy, setSelectedVersionPolicy] = useState<Policy | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Policy | null>(null);
   const [search, setSearch] = useState('');
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validating, setValidating] = useState(false);
+  const validateTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const [diffFrom, setDiffFrom] = useState<string | null>(null);
+  const [diffTo, setDiffTo] = useState<string | null>(null);
+  const [diffText, setDiffText] = useState<string | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [diffSections, setDiffSections] = useState<{ changed: string[]; added: string[]; removed: string[] } | null>(null);
 
   const fetchData = useCallback(async () => {
     const [polRes, assignRes, usersRes, groupsRes] = await Promise.all([
@@ -51,6 +61,33 @@ export default function Policies() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Debounced YAML validation
+  useEffect(() => {
+    if (!editingPolicy) return;
+    clearTimeout(validateTimerRef.current);
+    validateTimerRef.current = setTimeout(async () => {
+      if (!editorYaml.trim()) {
+        setValidationErrors(['No YAML provided']);
+        return;
+      }
+      setValidating(true);
+      try {
+        const res = await fetch('/admin/api/policies/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ yaml: editorYaml }),
+        });
+        const data = await res.json();
+        setValidationErrors(data.errors || []);
+      } catch {
+        setValidationErrors(['Failed to reach validation endpoint']);
+      } finally {
+        setValidating(false);
+      }
+    }, 500);
+    return () => clearTimeout(validateTimerRef.current);
+  }, [editorYaml, editingPolicy]);
 
   const fetchVersions = async (policyId: string) => {
     const { data } = await supabase
@@ -285,7 +322,12 @@ export default function Policies() {
                   setActiveTab('library');
                   fetchData();
                 }}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors flex items-center gap-1"
+                disabled={validationErrors.length > 0 || validating}
+                className={`px-3 py-1.5 text-sm font-medium text-white rounded-lg transition-colors flex items-center gap-1 ${
+                  validationErrors.length > 0 || validating
+                    ? 'bg-zinc-400 cursor-not-allowed'
+                    : 'bg-teal-600 hover:bg-teal-500'
+                }`}
               >
                 <Save className="w-3.5 h-3.5" /> Save
               </button>
@@ -303,6 +345,25 @@ export default function Policies() {
                 className="w-full h-[500px] p-4 font-mono text-sm text-zinc-800 bg-white resize-none focus:outline-none leading-relaxed"
                 spellCheck={false}
               />
+              {validationErrors.length > 0 && (
+                <div className="px-4 py-3 bg-red-50 border-t border-red-200">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                    <span className="text-xs font-medium text-red-700">Validation Errors</span>
+                  </div>
+                  <ul className="space-y-0.5">
+                    {validationErrors.map((err, i) => (
+                      <li key={i} className="text-xs text-red-600">{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {validationErrors.length === 0 && !validating && editorYaml.trim() && (
+                <div className="px-4 py-2 bg-emerald-50 border-t border-emerald-200 flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-xs text-emerald-700">YAML is valid</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -437,25 +498,121 @@ export default function Policies() {
 
       <Modal
         open={!!selectedVersionPolicy}
-        onClose={() => setSelectedVersionPolicy(null)}
+        onClose={() => {
+          setSelectedVersionPolicy(null);
+          setDiffFrom(null);
+          setDiffTo(null);
+          setDiffText(null);
+          setDiffSections(null);
+        }}
         title={`Version History: ${selectedVersionPolicy?.name || ''}`}
       >
-        <div className="space-y-3 max-h-64 overflow-y-auto">
-          {versions.length === 0 ? (
-            <p className="text-sm text-zinc-500">No previous versions</p>
-          ) : (
-            versions.map((v) => (
-              <div key={v.id} className="flex items-start gap-3 p-3 bg-zinc-50 rounded-lg">
-                <div className="flex-shrink-0 w-16">
-                  <span className="text-sm font-mono font-medium text-zinc-700">v{v.version}</span>
+        <div className="space-y-3">
+          {(diffFrom || diffTo) && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-zinc-500">
+                {diffFrom && diffTo
+                  ? `Comparing v${diffFrom} → v${diffTo}`
+                  : `Selected v${diffFrom || diffTo} — click another version to compare`}
+              </p>
+              <button
+                onClick={() => { setDiffFrom(null); setDiffTo(null); setDiffText(null); setDiffSections(null); }}
+                className="text-xs text-zinc-500 hover:text-zinc-700 underline"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {versions.length === 0 ? (
+              <p className="text-sm text-zinc-500">No previous versions</p>
+            ) : (
+              versions.map((v) => {
+                const isSelected = diffFrom === v.version || diffTo === v.version;
+                return (
+                  <button
+                    key={v.id}
+                    onClick={async () => {
+                      if (!diffFrom) {
+                        setDiffFrom(v.version);
+                      } else if (!diffTo && v.version !== diffFrom) {
+                        setDiffTo(v.version);
+                        setDiffLoading(true);
+                        try {
+                          const res = await fetch(
+                            `/admin/api/policies/${selectedVersionPolicy!.id}/diff?from_version=${encodeURIComponent(diffFrom)}&to_version=${encodeURIComponent(v.version)}`
+                          );
+                          const data = await res.json();
+                          setDiffText(data.unified_diff || '');
+                          setDiffSections({
+                            changed: data.sections_changed || [],
+                            added: data.sections_added || [],
+                            removed: data.sections_removed || [],
+                          });
+                        } catch {
+                          setDiffText('Failed to load diff');
+                        } finally {
+                          setDiffLoading(false);
+                        }
+                      } else {
+                        setDiffFrom(v.version);
+                        setDiffTo(null);
+                        setDiffText(null);
+                        setDiffSections(null);
+                      }
+                    }}
+                    className={`w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors ${
+                      isSelected ? 'bg-teal-50 ring-1 ring-teal-300' : 'bg-zinc-50 hover:bg-zinc-100'
+                    }`}
+                  >
+                    <div className="flex-shrink-0 w-16">
+                      <span className="text-sm font-mono font-medium text-zinc-700">v{v.version}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-zinc-600">{v.changelog}</p>
+                      <p className="text-[11px] text-zinc-400 mt-1">{formatRelativeTime(v.created_at)}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-300 flex-shrink-0" />
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {diffLoading && (
+            <p className="text-xs text-zinc-400 text-center py-2">Loading diff...</p>
+          )}
+
+          {diffText !== null && !diffLoading && (
+            <div className="space-y-2">
+              {diffSections && (
+                <div className="flex flex-wrap gap-1.5">
+                  {diffSections.changed.map((s) => (
+                    <span key={s} className="px-2 py-0.5 text-[11px] bg-amber-50 text-amber-700 rounded">changed: {s}</span>
+                  ))}
+                  {diffSections.added.map((s) => (
+                    <span key={s} className="px-2 py-0.5 text-[11px] bg-emerald-50 text-emerald-700 rounded">added: {s}</span>
+                  ))}
+                  {diffSections.removed.map((s) => (
+                    <span key={s} className="px-2 py-0.5 text-[11px] bg-red-50 text-red-700 rounded">removed: {s}</span>
+                  ))}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-zinc-600">{v.changelog}</p>
-                  <p className="text-[11px] text-zinc-400 mt-1">{formatRelativeTime(v.created_at)}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-zinc-300 flex-shrink-0" />
+              )}
+              <div className="bg-zinc-900 rounded-lg overflow-auto max-h-64">
+                <pre className="p-4 text-xs font-mono leading-relaxed">
+                  {diffText.split('\n').map((line, i) => {
+                    let cls = 'text-zinc-400';
+                    if (line.startsWith('+')) cls = 'text-emerald-400 bg-emerald-950/40';
+                    else if (line.startsWith('-')) cls = 'text-red-400 bg-red-950/40';
+                    else if (line.startsWith('@@')) cls = 'text-blue-400';
+                    return (
+                      <div key={i} className={`px-2 ${cls}`}>{line || ' '}</div>
+                    );
+                  })}
+                </pre>
               </div>
-            ))
+            </div>
           )}
         </div>
       </Modal>

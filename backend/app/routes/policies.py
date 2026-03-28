@@ -271,6 +271,16 @@ async def diff_policy_versions(
     )
 
 
+@router.post("/policies/validate")
+async def validate_policy_inline(body: dict):
+    """Validate arbitrary policy YAML without requiring a saved policy."""
+    yaml_str = body.get("yaml", "")
+    if not yaml_str:
+        return {"valid": False, "errors": ["No YAML provided"]}
+    valid, errors = validate_policy_yaml(yaml_str)
+    return {"valid": valid, "errors": errors}
+
+
 @router.post("/policies/{policy_id}/validate")
 async def validate_policy(
     policy_id: uuid.UUID,
