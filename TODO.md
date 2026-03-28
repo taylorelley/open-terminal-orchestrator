@@ -23,6 +23,76 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ---
 
+## Next Steps — Prioritized Phases
+
+The remaining ~20 items are organized into 5 phases based on dependencies and impact.
+Phases 2 and 3 can run in parallel. Phase 4 follows 1-2. Phase 5 follows 3-4.
+
+### Phase 1: Backend Event Infrastructure (P1 — do first)
+
+Unblocks alerting, observability, and SIEM compliance. No frontend dependencies.
+
+| # | Item | Depends On | Section |
+|---|------|-----------|---------|
+| 1A | Webhook notifications for lifecycle events — create `webhook_service.py`, hook into `audit_service.py`, add webhook CRUD to system routes | — | §10 |
+| 1B | Syslog/SIEM forwarding — create `syslog_service.py` (RFC 5424, TCP/UDP), hook into audit service | — | §10 |
+| 1C | Prometheus metrics hardening — add histogram buckets for sandbox startup latency, pool utilization gauges, webhook delivery counters | 1A (partial) | §10 |
+| 1D | LiteLLM Proxy inference routing — add `/v1/chat/completions`, `/v1/completions`, `/v1/models` routes in `proxy.py`, reuse `sandbox_resolver` | — | §10 |
+
+1A and 1B are independent. 1C depends partially on 1A. 1D is fully independent.
+
+### Phase 2: Frontend Enhancements (P2 — after Phase 1A)
+
+Operator-facing improvements. The monitoring page currently uses generated fake data.
+
+| # | Item | Depends On | Section |
+|---|------|-----------|---------|
+| 2A | Historical trend selector (1h/24h/7d/30d) — replace `generateTimeSeries` in `Monitoring.tsx` with real data, add backend `GET /admin/api/metrics/history` | — | §8 |
+| 2B | Bulk actions on sandbox table — add checkbox column + toolbar in `Sandboxes.tsx`, add `POST /admin/api/sandboxes/bulk` endpoint | — | §8 |
+| 2C | Threshold alerts configuration — add "Alerts" tab to Monitoring, store in `system_config`, fire via webhooks | Phase 1A | §8 |
+| 2D | Terminal embed in sandbox detail panel — add xterm.js, WebSocket to sandbox Open Terminal, gate behind "Open Terminal" button | — | §8 |
+| 2E | Drag-and-drop policy assignment — add drag API to `Policies.tsx` assignments tab | — | §8 |
+
+2A, 2B, 2D, 2E are independent. 2C depends on Phase 1A (webhooks).
+
+### Phase 3: Deployment Hardening (P2 — parallel with Phase 2)
+
+Production-readiness for non-Docker-Compose environments.
+
+| # | Item | Depends On | Section |
+|---|------|-----------|---------|
+| 3A | Database migration scripts — convert Supabase SQL to Alembic, add `alembic upgrade head` to Docker entrypoint | — | §11 |
+| 3B | Kubernetes/K3s manifests — `deploy/k3s/` with namespace, deployment, service, ingress, configmap, secrets, PVCs | 3A (referenced) | §11 |
+| 3C | TLS/reverse proxy configuration guide — nginx, Caddy, Traefik sample configs for TLS termination | — | §11 |
+
+### Phase 4: Testing (P2 — after Phases 1-2)
+
+Build confidence before production deployment.
+
+| # | Item | Depends On | Section |
+|---|------|-----------|---------|
+| 4A | End-to-end test — `test_e2e_flow.py`: user request → sandbox provision → command execution → response, plus error paths (no pool, sandbox suspended) | Phases 1-2 | §12 |
+| 4B | Frontend component tests — add Vitest + React Testing Library, cover Sandboxes, Policies, Monitoring pages | Phase 2 | §12 |
+
+4A and 4B are independent of each other.
+
+### Phase 5: Documentation (P3 — after Phases 3-4)
+
+Make the project approachable for operators and contributors, ordered by value.
+
+| # | Item | Depends On | Section |
+|---|------|-----------|---------|
+| 5A | Deployment guide (Docker Compose + K3s) | Phase 3 | §13 |
+| 5B | API reference (OpenAPI/Swagger) — enhance FastAPI route descriptions and response examples | — | §13 |
+| 5C | Policy authoring guide — YAML format, tier system, assignment precedence, examples | — | §13 |
+| 5D | Architecture overview with diagrams | — | §13 |
+| 5E | Operator runbook — troubleshooting, backup/restore | — | §13 |
+| 5F | Contributing guide — dev setup, test commands, PR process | — | §13 |
+
+All items are independent. 5A should come after Phase 3 artifacts exist.
+
+---
+
 ## 1. Backend Orchestrator — P0 (PRD Section 5)
 
 - [x] Scaffold FastAPI Python project structure
