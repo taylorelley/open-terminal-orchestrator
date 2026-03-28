@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Group, User
-from app.schemas import GroupCreate, GroupResponse, GroupUpdate, UserResponse
+from app.schemas import GroupCreate, GroupResponse, GroupUpdate, UserResponse, UserSyncResponse
 from app.services.admin_auth import require_admin
 from app.services.audit_service import log_admin
+from app.services.user_sync_service import sync_users_from_owui
 
 router = APIRouter(
     prefix="/admin/api",
@@ -28,10 +29,21 @@ async def list_users(db: AsyncSession = Depends(get_db)):
     return rows
 
 
-@router.post("/users/sync")
-async def sync_users():
-    """Placeholder — real sync requires Open WebUI API integration."""
-    return {"status": "pending", "message": "Open WebUI sync not yet implemented"}
+@router.post("/users/sync", response_model=UserSyncResponse)
+async def sync_users(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Sync users from Open WebUI into ShellGuard."""
+    result = await sync_users_from_owui(db)
+    log_admin(
+        db,
+        "user_sync",
+        details=result,
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.flush()
+    return UserSyncResponse(status="success", **result)
 
 
 # ---------------------------------------------------------------------------

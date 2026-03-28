@@ -141,6 +141,15 @@ class UserResponse(BaseModel):
     group: GroupResponse | None = None
 
 
+class UserSyncResponse(BaseModel):
+    status: str
+    created: int
+    updated: int
+    unchanged: int
+    total_remote: int
+    message: str = ""
+
+
 # ---------------------------------------------------------------------------
 # Sandbox
 # ---------------------------------------------------------------------------

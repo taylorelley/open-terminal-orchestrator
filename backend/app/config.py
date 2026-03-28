@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # External services
     openshell_gateway: str = "http://openshell-gateway:6443"
+    open_webui_base_url: str = "http://open-webui:8080"
     open_webui_api_key: str = ""
     admin_api_key: str = ""
 
