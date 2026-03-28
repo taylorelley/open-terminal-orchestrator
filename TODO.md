@@ -15,7 +15,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | Database Schema (Section 10) | 100% | All tables, RLS, indexes in place |
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
-| Management API (Section 9.2) | ~95% | All CRUD endpoints implemented; metrics placeholder remaining |
+| Management API (Section 9.2) | ~98% | All CRUD endpoints implemented; user sync placeholder remaining |
 | Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff all implemented |
 | Sandbox Lifecycle (Section 6) | ~85% | Pool manager, openshell client, lifecycle automation implemented |
 | Integrations (Section 12) | 0% | UI config only, no backend |
@@ -115,7 +115,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ### System
 - [x] `GET /admin/api/health` — detailed health status
-- [-] `GET /admin/api/metrics` — Prometheus-format metrics (placeholder)
+- [x] `GET /admin/api/metrics` — Prometheus-format metrics export
 - [x] `GET /admin/api/config` — system configuration
 - [x] `PUT /admin/api/config` — update configuration
 - [x] `POST /admin/api/backup` — trigger database backup

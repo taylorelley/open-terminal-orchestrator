@@ -1,17 +1,20 @@
 """FastAPI application factory and entry point."""
 
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import check_db_connection, engine
+from app.database import check_db_connection, engine, get_db
 from app.logging import setup_logging
-from app.middleware import RequestIDMiddleware, configure_cors
+from app.middleware import PrometheusMiddleware, RequestIDMiddleware, configure_cors
 from app.routes.health import router as health_router
 from app.routes.policies import router as policies_router
 from app.routes.proxy import router as proxy_router
@@ -59,6 +62,7 @@ app = FastAPI(
 )
 
 # Middleware (order matters — outermost first)
+app.add_middleware(PrometheusMiddleware)
 app.add_middleware(RequestIDMiddleware)
 configure_cors(app)
 
@@ -69,6 +73,26 @@ app.include_router(sandboxes_router)
 app.include_router(policies_router)
 app.include_router(users_router)
 app.include_router(system_router)
+
+# Root-level metrics endpoint for Prometheus scraping (optional token auth).
+@app.get("/metrics", tags=["metrics"])
+async def prometheus_metrics(
+    authorization: str | None = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.metrics import collect_db_gauges, generate_metrics_output
+
+    if settings.metrics_token:
+        expected = f"Bearer {settings.metrics_token}"
+        if not authorization or not secrets.compare_digest(authorization, expected):
+            raise HTTPException(status_code=401, detail="Invalid metrics token")
+
+    await collect_db_gauges(db)
+    return PlainTextResponse(
+        content=generate_metrics_output(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
 
 # Serve the frontend SPA at /admin if the build output exists.
 _dist = Path(settings.frontend_dist_path)

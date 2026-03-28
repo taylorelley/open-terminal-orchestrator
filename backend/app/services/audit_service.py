@@ -40,6 +40,8 @@ def log_lifecycle(
     If a ``Sandbox`` object is provided, ``user_id`` and ``sandbox_id``
     are extracted from it automatically.
     """
+    from app.metrics import record_audit_event
+
     entry = AuditLogEntry(
         id=uuid.uuid4(),
         timestamp=datetime.now(timezone.utc),
@@ -51,6 +53,7 @@ def log_lifecycle(
         source_ip=source_ip,
     )
     db.add(entry)
+    record_audit_event("lifecycle", event_type)
     return entry
 
 
@@ -64,6 +67,8 @@ def log_enforcement(
     source_ip: str = "",
 ) -> AuditLogEntry:
     """Create an enforcement audit entry and add it to the session."""
+    from app.metrics import record_audit_event
+
     entry = AuditLogEntry(
         id=uuid.uuid4(),
         timestamp=datetime.now(timezone.utc),
@@ -75,6 +80,7 @@ def log_enforcement(
         source_ip=source_ip,
     )
     db.add(entry)
+    record_audit_event("enforcement", event_type)
     return entry
 
 
@@ -86,6 +92,8 @@ def log_admin(
     source_ip: str = "",
 ) -> AuditLogEntry:
     """Create an admin audit entry and add it to the session."""
+    from app.metrics import record_audit_event
+
     entry = AuditLogEntry(
         id=uuid.uuid4(),
         timestamp=datetime.now(timezone.utc),
@@ -95,6 +103,7 @@ def log_admin(
         source_ip=source_ip,
     )
     db.add(entry)
+    record_audit_event("admin", event_type)
     return entry
 
 
