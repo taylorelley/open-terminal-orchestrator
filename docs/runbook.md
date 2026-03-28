@@ -1,104 +1,416 @@
 # ShellGuard Operator Runbook
 
+This document covers operational procedures, troubleshooting, backup/restore, and log analysis for ShellGuard.
+
+## Health Checks
+
+### Quick Health Check
+
+```bash
+curl http://localhost:8080/health
+```
+
+Expected response:
+
+```json
+{"status": "healthy", "version": "0.1.0", "checks": {"database": "connected"}}
+```
+
+### Detailed Health Check (authenticated)
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/health
+```
+
+### Pool Status
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/pool
+```
+
+Check that:
+- `pool` count is at or near `warmup_size`
+- `total` is below `max_sandboxes`
+- `active` is below `max_active`
+
+---
+
 ## Troubleshooting
 
-### Sandbox stuck in WARMING
+### Sandbox Stuck in WARMING
 
-**Symptoms:** Sandbox stays in WARMING state for more than `startup_timeout` (default 120s).
+**Symptoms:** A sandbox remains in WARMING state beyond the `startup_timeout` (default 120 seconds). Users see 202 responses that never resolve.
 
-**Resolution:**
-1. Check pool manager logs: `docker logs shellguard | grep WARMING`
-2. The pool manager automatically destroys stuck sandboxes after `startup_timeout`
-3. If stuck manually, call `DELETE /admin/api/sandboxes/{id}` to force destroy
-4. Check OpenShell gateway connectivity: `curl http://openshell-gateway:6443/health`
+**Diagnosis:**
 
-### Database connection failures
+1. Check the sandbox record:
 
-**Symptoms:** Health endpoint returns `{"status": "degraded", "checks": {"database": "disconnected"}}`.
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/sandboxes?state=WARMING
+```
 
-**Resolution:**
-1. Verify PostgreSQL is running: `pg_isready -h localhost -p 5432`
-2. Check `DATABASE_URL` environment variable format
-3. Verify network connectivity between ShellGuard and PostgreSQL
-4. Check PostgreSQL max connections (`max_connections` in postgresql.conf)
+2. Check ShellGuard backend logs for OpenShell errors:
 
-### Webhook delivery failures
+```bash
+# Docker Compose
+docker compose logs shellguard | grep -i "warming\|openshell\|sandbox create"
 
-**Symptoms:** Webhook events not reaching configured endpoints.
+# K3s
+kubectl -n shellguard logs deployment/shellguard | grep -i "warming\|openshell"
+```
 
-**Resolution:**
-1. Check webhook config: `GET /admin/api/webhooks`
-2. Test individual webhooks: `POST /admin/api/webhooks/{index}/test`
-3. Check webhook delivery metrics in Prometheus: `shellguard_webhook_deliveries_total`
-4. Verify the webhook URL is reachable from the ShellGuard container
-5. Check for SSL/TLS certificate issues if using HTTPS webhooks
+3. Check OpenShell gateway status:
 
-### Pool exhaustion
+```bash
+curl http://OPENSHELL_GATEWAY:6443/health
+```
 
-**Symptoms:** New sandbox requests return 503 or long wait times.
+**Common causes and fixes:**
 
-**Resolution:**
-1. Check pool status: `GET /admin/api/pool`
-2. Increase `POOL_MAX_SANDBOXES` or `POOL_MAX_ACTIVE` if resources allow
-3. Reduce `IDLE_TIMEOUT` to reclaim unused sandboxes faster
-4. Check for sandboxes stuck in WARMING that are consuming slots
-5. Manually destroy unused sandboxes: `DELETE /admin/api/sandboxes/{id}`
+| Cause | Fix |
+|---|---|
+| OpenShell gateway unreachable | Verify `OPENSHELL_GATEWAY` env var and network connectivity |
+| Image pull failure | Verify `DEFAULT_IMAGE_TAG` exists in the registry; check OpenShell logs |
+| Resource exhaustion on K3s | Check node resources: `kubectl top nodes` |
+| Policy validation failure | Check audit log for policy application errors |
 
-### High memory/CPU usage
+**Resolution:** If the sandbox cannot recover, destroy it manually:
 
-**Symptoms:** Resource metrics spiking on monitoring dashboard.
+```bash
+curl -X DELETE -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/sandboxes/SANDBOX_UUID
+```
 
-**Resolution:**
-1. Identify heavy sandboxes via Monitoring > Resource Usage tab
-2. Suspend idle sandboxes: `POST /admin/api/sandboxes/{id}/suspend`
-3. Use bulk actions to suspend multiple sandboxes at once
-4. Check if policy resource limits are properly configured
+The pool manager will create a replacement pre-warmed sandbox automatically.
+
+### Database Connection Failures
+
+**Symptoms:** Health endpoint returns `{"status": "degraded", "checks": {"database": "disconnected"}}`. All management API calls return 500 errors. Proxy requests may still work for sandboxes already resolved and cached.
+
+**Diagnosis:**
+
+1. Check database container/pod status:
+
+```bash
+# Docker Compose
+docker compose ps shellguard-db
+docker compose logs shellguard-db
+
+# K3s
+kubectl -n shellguard get pods -l app=shellguard-db
+kubectl -n shellguard logs statefulset/shellguard-db
+```
+
+2. Test database connectivity directly:
+
+```bash
+# Docker Compose
+docker compose exec shellguard-db pg_isready -U shellguard
+
+# K3s
+kubectl -n shellguard exec statefulset/shellguard-db -- pg_isready -U shellguard
+```
+
+3. Check the `DATABASE_URL` environment variable matches the actual database host, port, user, and password.
+
+**Common causes and fixes:**
+
+| Cause | Fix |
+|---|---|
+| Database container crashed | `docker compose restart shellguard-db` or delete the pod to let K3s reschedule |
+| Disk full on database volume | Expand the volume or clean up old audit logs |
+| Connection limit exceeded | Increase `max_connections` in PostgreSQL config; check for connection leaks |
+| Password mismatch | Verify `SG_DB_PASS` / `DATABASE_URL` match the database credentials |
+
+### Webhook Delivery Failures
+
+**Symptoms:** Configured webhooks are not receiving events. No external notifications for sandbox lifecycle changes.
+
+**Diagnosis:**
+
+1. List configured webhooks:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/webhooks
+```
+
+2. Test a specific webhook:
+
+```bash
+curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/webhooks/0/test
+```
+
+3. Check backend logs for delivery errors:
+
+```bash
+docker compose logs shellguard | grep -i "webhook"
+```
+
+**Common causes and fixes:**
+
+| Cause | Fix |
+|---|---|
+| Webhook URL unreachable | Verify URL and network access from the ShellGuard container |
+| TLS certificate errors | Ensure the webhook endpoint's certificate is trusted |
+| Webhook disabled | Check `enabled` field in webhook config |
+| Event filter too restrictive | Review `event_filters` -- an empty list matches all events |
+
+### Pool Exhaustion
+
+**Symptoms:** New users cannot get sandboxes. Pre-warmed pool is empty. Existing users experience long waits.
+
+**Diagnosis:**
+
+1. Check pool status:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/pool
+```
+
+2. If `total` equals `max_sandboxes`, the pool is full. Check how many sandboxes are SUSPENDED vs ACTIVE:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8080/admin/api/sandboxes?state=SUSPENDED"
+```
+
+**Remediation:**
+
+- **Destroy idle suspended sandboxes** to free capacity:
+
+```bash
+curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \
+     -H "Content-Type: application/json" \
+     http://localhost:8080/admin/api/sandboxes/bulk \
+     -d '{"action": "destroy", "sandbox_ids": ["uuid1", "uuid2"]}'
+```
+
+- **Increase pool limits** if the infrastructure supports it:
+
+```bash
+curl -X PUT -H "Authorization: Bearer YOUR_API_KEY" \
+     -H "Content-Type: application/json" \
+     http://localhost:8080/admin/api/pool \
+     -d '{"value": {"max_sandboxes": 30, "max_active": 15, "warmup_size": 3}}'
+```
+
+- **Reduce idle/suspend timeouts** to reclaim sandboxes faster (set `IDLE_TIMEOUT` and `SUSPEND_TIMEOUT` environment variables and restart).
+
+### Sandbox Policy Not Taking Effect
+
+**Symptoms:** A user's sandbox does not reflect the expected policy (e.g., network rules not applied).
+
+**Diagnosis:**
+
+1. Check policy assignments for the user:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8080/admin/api/policies/assignments?entity_type=user&entity_id=USER_UUID"
+```
+
+2. Check the sandbox's assigned policy:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/sandboxes/SANDBOX_UUID
+```
+
+3. If a policy was updated, check whether the changes were dynamic or static:
+   - Dynamic (network, inference): Should be hot-reloaded. Check audit log for hot-reload events.
+   - Static (filesystem, process): Requires sandbox recreation. Check if the sandbox is flagged for recreation.
+
+---
 
 ## Backup and Restore
 
-### Creating a backup
+### Configuration Backup
+
+ShellGuard provides a built-in backup endpoint that exports all policies, policy versions, assignments, groups, and system configuration:
 
 ```bash
-curl -s -H "Authorization: Bearer $ADMIN_API_KEY" \
-  http://localhost:8080/admin/api/backup \
-  -o shellguard-backup-$(date +%Y%m%d).json
+curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/backup \
+     -o "shellguard-backup-$(date +%Y%m%dT%H%M%SZ).json"
 ```
 
-The backup includes: policies, policy versions, assignments, groups, and system configuration.
+The backup JSON includes:
+- All policies with their YAML definitions
+- Full policy version history
+- All policy assignments
+- All groups
+- All system configuration entries
 
-### Restoring from backup
+Schedule this regularly (e.g., via cron):
 
-Currently, restoration is manual:
-1. Parse the backup JSON
-2. Insert records via the Management API (POST /admin/api/policies, etc.)
-3. Verify assignments and configuration
+```bash
+0 2 * * * curl -s -X POST -H "Authorization: Bearer YOUR_API_KEY" \
+  http://localhost:8080/admin/api/backup \
+  -o /backups/shellguard/shellguard-backup-$(date +\%Y\%m\%dT\%H\%M\%SZ).json
+```
+
+### Full Database Backup
+
+For a complete backup including audit logs, sandbox records, and metric snapshots:
+
+```bash
+# Docker Compose
+docker compose exec shellguard-db \
+  pg_dump -U shellguard shellguard > shellguard-full-$(date +%Y%m%d).sql
+
+# K3s
+kubectl -n shellguard exec statefulset/shellguard-db -- \
+  pg_dump -U shellguard shellguard > shellguard-full-$(date +%Y%m%d).sql
+```
+
+### Restore
+
+To restore a full database backup:
+
+```bash
+# Docker Compose
+cat shellguard-full-YYYYMMDD.sql | \
+  docker compose exec -T shellguard-db psql -U shellguard shellguard
+
+# K3s
+cat shellguard-full-YYYYMMDD.sql | \
+  kubectl -n shellguard exec -i statefulset/shellguard-db -- psql -U shellguard shellguard
+```
+
+After restoring, restart the ShellGuard backend to reload configuration from the database.
+
+---
 
 ## Log Analysis
 
-### Structured log format
+### Backend Logs
 
-ShellGuard uses JSON-structured logging. Key fields:
-- `timestamp`: ISO 8601
-- `level`: DEBUG, INFO, WARNING, ERROR
-- `message`: Human-readable message
-- `extra`: Additional context (sandbox_name, user_id, etc.)
-
-### Useful log queries
+ShellGuard logs to stdout in structured format. The log level is controlled by the `LOG_LEVEL` environment variable (default: `info`).
 
 ```bash
-# Find all sandbox lifecycle events
-docker logs shellguard | jq 'select(.message | contains("sandbox"))'
+# Docker Compose
+docker compose logs -f shellguard
 
-# Find pool manager issues
-docker logs shellguard | jq 'select(.message | contains("Pool"))'
-
-# Find authentication failures
-docker logs shellguard | jq 'select(.level == "WARNING" and (.message | contains("auth")))'
+# K3s
+kubectl -n shellguard logs -f deployment/shellguard
 ```
 
-## Monitoring Alerts
+### Key Log Patterns
 
-Configure threshold alerts in the Monitoring > Alerts tab to get notified via webhooks when:
-- CPU usage exceeds 80% (`cpu gt 80`)
-- Available pool sandboxes drops below 2 (`pool_available lt 2`)
-- Active sandboxes near max capacity (`active_sandboxes gt 8`)
+| Pattern | Meaning |
+|---|---|
+| `openshell suspend failed` | OpenShell API error during sandbox suspension |
+| `openshell resume failed` | OpenShell API error during sandbox resume |
+| `openshell destroy failed` | OpenShell API error during sandbox destruction (sandbox marked destroyed anyway) |
+| `Failed to apply policy` | Policy could not be applied to a running sandbox |
+| `Terminal WebSocket error` | Error in the admin terminal WebSocket relay |
+
+### Audit Log Queries
+
+Use the management API to query structured audit events:
+
+```bash
+# All enforcement events in the last 24 hours
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8080/admin/api/audit?category=enforcement&since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+
+# Policy denials for a specific user
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8080/admin/api/audit?event_type=policy_deny&user_id=USER_UUID"
+
+# All admin actions
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8080/admin/api/audit?category=admin"
+```
+
+### Audit Log Export
+
+For external analysis or compliance reporting:
+
+```bash
+# Export as JSON
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8080/admin/api/audit/export?format=json&since=2026-01-01T00:00:00Z" \
+     -o audit-export.json
+
+# Export as CSV
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8080/admin/api/audit/export?format=csv" \
+     -o audit-export.csv
+
+# Export as JSONL (for streaming ingestion)
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:8080/admin/api/audit/export?format=jsonl" \
+     -o audit-export.jsonl
+```
+
+Maximum export size is 10,000 entries per request. Use time-range filters to export in batches if needed.
+
+### Prometheus Metrics
+
+ShellGuard exposes Prometheus-compatible metrics:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/metrics
+```
+
+If `METRICS_TOKEN` is set, the public `/metrics` endpoint can be scraped without the admin API key by using the metrics token as a bearer token.
+
+### Syslog Integration
+
+Test syslog forwarding:
+
+```bash
+curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \
+     http://localhost:8080/admin/api/syslog/test
+```
+
+Configure syslog forwarding in the system settings to send audit events to your SIEM.
+
+---
+
+## Operational Procedures
+
+### Scaling the Pool
+
+When user count increases, adjust pool parameters:
+
+1. Increase `max_sandboxes` and `max_active` via the pool API or environment variables.
+2. Increase `warmup_size` to reduce cold-start latency for new users.
+3. Ensure the K3s cluster has sufficient resources (CPU, memory, storage).
+
+### Rotating API Keys
+
+1. Generate a new API key:
+
+```bash
+curl -X POST -H "Authorization: Bearer CURRENT_KEY" \
+     "http://localhost:8080/admin/api/auth/keys?label=new-primary"
+```
+
+2. Update all clients to use the new key.
+3. Revoke the old key:
+
+```bash
+curl -X DELETE -H "Authorization: Bearer NEW_KEY" \
+     http://localhost:8080/admin/api/auth/keys/OLD_KEY_ID
+```
+
+### Emergency: Destroy All Sandboxes
+
+In an emergency, destroy all active sandboxes:
+
+1. List all non-destroyed sandboxes.
+2. Use the bulk action endpoint to destroy them.
+3. The pool manager will recreate pre-warmed sandboxes automatically once the situation stabilizes.
+
+### Audit Retention
+
+Audit logs are retained for 90 days by default (`AUDIT_RETENTION_DAYS`). The retention cleanup runs every 24 hours (`AUDIT_RETENTION_INTERVAL`). Export audit data before it expires if long-term retention is required.
