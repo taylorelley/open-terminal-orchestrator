@@ -30,6 +30,7 @@ test = [
 
 [project.scripts]
 shellguard = "app.main:run"
+shellguard-cli = "app.cli:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

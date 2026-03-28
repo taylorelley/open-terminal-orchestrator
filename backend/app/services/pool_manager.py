@@ -181,6 +181,10 @@ async def _destroy_expired(db: AsyncSession, cfg: dict) -> None:
         except Exception:
             logger.exception("openshell destroy failed for %s — marking destroyed anyway", sandbox.name)
 
+        # Release GPU allocation if this sandbox held one.
+        if sandbox.gpu_enabled:
+            openshell_client.gpu_scheduler.release(sandbox.name)
+
         sandbox.state = "DESTROYED"
         sandbox.destroyed_at = datetime.now(timezone.utc)
         sandbox.cpu_usage = 0
@@ -302,6 +306,10 @@ async def _recreate_pending(db: AsyncSession, cfg: dict) -> None:
                 "openshell destroy failed for %s — marking destroyed anyway",
                 sandbox.name,
             )
+
+        # Release GPU allocation if this sandbox held one.
+        if sandbox.gpu_enabled:
+            openshell_client.gpu_scheduler.release(sandbox.name)
 
         sandbox.state = "DESTROYED"
         sandbox.destroyed_at = datetime.now(timezone.utc)
