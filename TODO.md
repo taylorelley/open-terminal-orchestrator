@@ -11,25 +11,53 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 | Area | Completion | Notes |
 |------|-----------|-------|
-| Frontend UI (Section 8) | 100% | All pages, components, routing, monitoring, bulk actions, DnD implemented |
+| Frontend UI (Section 8) | 95% | All pages, components, routing implemented; lint/typecheck broken (missing node_modules) |
 | Database Schema (Section 10) | 100% | All tables, RLS, indexes, metric_snapshots in place |
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
 | Management API (Section 9.2) | 100% | All CRUD + bulk + metrics + alerts + dry-run + resolve + version get + group members done |
 | Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff, dry-run all done |
 | Sandbox Lifecycle (Section 6) | 100% | Pool manager, openshell client, lifecycle automation, metric snapshots implemented |
-| Integrations (Section 12) | 100% | Open WebUI, OpenShell CLI, LiteLLM, Prometheus, webhooks, syslog, OTel, Grafana all done |
-| Testing (Section 12) | 100% | Backend pytest comprehensive (20 files); frontend Vitest + RTL covering critical pages |
-| Deployment (Section 13) | 100% | Docker Compose, K3s, Alembic, TLS guide all done |
-| Documentation (Section 13) | 100% | Architecture, deployment, policy, API, runbook, contributing all done |
+| Integrations (Section 12) | ~85% | GPU passthrough is stub-only; LiteLLM is routing-only (no credential mgmt) |
+| Testing (Section 12) | ~55% | 129/236 backend tests pass (106 error from cryptography dep); only 3 frontend test files |
+| Deployment (Section 13) | ~90% | Docker Compose, K3s, Alembic, TLS guide done; no CI/CD pipeline; build toolchain broken |
+| Documentation (Section 13) | ~90% | Architecture, deployment, policy, API, runbook, contributing done; no security review docs |
+| Production Readiness | ~70% | Missing LICENSE, SECURITY.md, CI/CD, CLI tool, security review, package.json metadata |
 
 ---
 
 ## Remaining Work
 
-All items complete. No remaining work.
+### P0 — Critical / Blocking
+
+- [ ] **Fix build toolchain**: Run `npm install` to populate `node_modules/`; verify `npm run build`, `npm run lint`, and `npm run typecheck` all pass
+- [ ] **Fix backend test environment**: Resolve `cryptography`/`_cffi_backend` `pyo3_runtime.PanicException` causing 106 integration test errors
+- [ ] **Fix ESLint configuration**: `eslint.config.js` imports `@eslint/js` which requires `npm install`; verify linting passes after install
+- [ ] **Fix TypeScript errors in test files**: Frontend test files have missing type declarations for vitest, @testing-library/react, @testing-library/user-event; likely resolved by `npm install` but may need tsconfig adjustment
+
+### P1 — High
+
+- [ ] **Add LICENSE file**: PRD Q6 — choose Apache 2.0 or MIT before public release
+- [ ] **Add SECURITY.md**: Vulnerability reporting process for open-source project
+- [ ] **Security review**: PRD Phase 4 exit criterion — threat model, dependency audit, OWASP check
+- [ ] **Fix `package.json` metadata**: Name is still `vite-react-typescript-starter@0.0.0`; update to `shellguard`
+- [ ] **CLI tool for policy management**: PRD Phase 2 deliverable — standalone CLI for policy CRUD, sandbox diagnostics, user sync (not yet started)
+
+### P2 — Medium
+
+- [ ] **GPU passthrough implementation**: PRD Phase 4 — currently stub-only (`gpu_enabled` column + `--gpu` flag); needs device detection, NVIDIA runtime config, resource scheduling
+- [ ] **LiteLLM credential routing**: PRD Section 12 — currently routing-only; needs credential stripping/injection, model management, provider configuration
+- [ ] **CI/CD pipeline**: Add `.github/workflows/` with build, lint, typecheck, backend tests, frontend tests
+- [ ] **Expand frontend test coverage**: Only 3 page tests exist (Policies, Monitoring, Sandboxes); Dashboard, Login, AuditLog, Settings, UsersGroups pages and UI components/hooks untested
+
+### P3 — Low
+
+- [ ] **Backend test failure**: 1 test fails (not just errors) — investigate and fix
+- [ ] **Frontend test for remaining UI components**: Badge, Modal, SlidePanel, Tabs, StatCard, EmptyState, TerminalEmbed, layout components
 
 ---
+
+## Detailed Completion Checklist
 
 ## 1. Backend Orchestrator — P0 (PRD Section 5)
 
@@ -150,6 +178,8 @@ All items complete. No remaining work.
 - [x] Drag-and-drop policy assignment
 - [x] Bulk actions on sandbox table (suspend/destroy selected)
 - [x] Historical trend selector for monitoring charts (1h, 24h, 7d, 30d)
+- [ ] Fix ESLint config — `npm install` required; `@eslint/js` not in `node_modules/`
+- [ ] Fix TypeScript errors — test files fail `tsc --noEmit` (missing type declarations)
 
 ## 9. BYOC Sandbox Image — P1 (PRD Section 5.3)
 
@@ -165,12 +195,13 @@ All items complete. No remaining work.
 - [x] OpenShell CLI sandbox lifecycle (`openshell sandbox create/suspend/resume/destroy` via `openshell_client.py`)
 - [x] OpenShell policy management (`policy set` and `policy get`)
 - [x] OpenShell credential injection (`openshell provider create`)
-- [x] LiteLLM Proxy inference routing (intercept and redirect model API calls)
+- [-] LiteLLM Proxy inference routing — routing layer only (`/v1/chat/completions` forwarded to sandbox); no credential stripping/injection, model management, or provider configuration in ShellGuard
 - [x] Prometheus metrics export endpoint (hardened with startup histograms, pool utilization, webhook counters)
 - [x] Webhook notifications for lifecycle events
 - [x] Syslog/SIEM forwarding for audit events
 - [x] OpenTelemetry trace propagation (Open WebUI → orchestrator → sandbox)
 - [x] Grafana dashboard template for Prometheus metrics
+- [-] GPU passthrough — stub only (`gpu_enabled` column + `--gpu` CLI flag); no device detection, NVIDIA runtime config, or resource scheduling (PRD Phase 4, G9)
 
 ## 11. Deployment — P2 (PRD Section 13)
 
@@ -178,18 +209,20 @@ All items complete. No remaining work.
 - [x] `Dockerfile` — ShellGuard orchestrator container (multi-stage: Node + Python)
 - [x] Kubernetes/K3s manifests for production deployment
 - [x] Environment variable documentation and `.env.example`
-- [x] Database initialization and migration scripts (for non-Supabase PostgreSQL)
+- [x] Database initialization and migration scripts (Alembic for non-Supabase PostgreSQL)
 - [x] TLS/reverse proxy configuration guide
+- [ ] CI/CD pipeline (`.github/workflows/`) — build, lint, typecheck, backend tests, frontend tests
+- [ ] Fix `package.json` metadata — name is `vite-react-typescript-starter@0.0.0`, should be `shellguard`
 
 ## 12. Testing — P2
 
-- [x] Set up test framework (pytest for backend, Vitest + React Testing Library for frontend)
+- [-] Set up test framework — pytest works; Vitest + RTL declared in `package.json` but `node_modules/` missing so frontend tests cannot run
 - [x] Unit tests for policy validation and diff logic
 - [x] Unit tests for sandbox state machine transitions
-- [x] Integration tests for API proxy routing
-- [x] Integration tests for management API endpoints
-- [x] End-to-end test: user request → sandbox provision → command execution → response
-- [x] Frontend component tests for critical UI flows (Sandboxes, Policies, Monitoring)
+- [-] Integration tests for API proxy routing — tests exist but 106/236 error with `pyo3_runtime.PanicException` (`cryptography`/`_cffi_backend` conflict)
+- [-] Integration tests for management API endpoints — same environment issue as above
+- [-] End-to-end test: user request → sandbox provision → command execution → response — same environment issue
+- [-] Frontend component tests for critical UI flows — only 3 page tests exist (Policies, Monitoring, Sandboxes); Dashboard, Login, AuditLog, Settings, UsersGroups untested
 
 ## 13. Documentation — P3
 
@@ -199,3 +232,11 @@ All items complete. No remaining work.
 - [x] API reference (OpenAPI/Swagger)
 - [x] Operator runbook (troubleshooting, backup/restore)
 - [x] Contributing guide
+
+## 14. Production Readiness — P1 (not in original PRD checklist)
+
+- [ ] Add LICENSE file (Apache 2.0 or MIT — PRD Q6)
+- [ ] Add SECURITY.md (vulnerability reporting process)
+- [ ] Security review — threat model, dependency audit, OWASP check (PRD Phase 4 exit criterion)
+- [ ] CLI tool for policy management and diagnostics (PRD Phase 2 deliverable)
+- [ ] Populate `node_modules/` — `npm install` has never been run; all frontend tooling is broken
