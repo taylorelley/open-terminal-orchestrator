@@ -27,7 +27,14 @@ npm run lint       # Run ESLint across the project
 npm run typecheck  # TypeScript type checking (tsc --noEmit)
 ```
 
-Always run `lint` and `typecheck` to validate changes before committing.
+### Backend
+
+```bash
+cd backend && pip install -e ".[test]"   # Install backend with test deps
+cd backend && python -m pytest -v        # Run backend tests
+```
+
+Always run `lint` and `typecheck` to validate frontend changes before committing.
 
 ## Project Structure
 
