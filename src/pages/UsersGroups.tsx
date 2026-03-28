@@ -29,6 +29,7 @@ export default function UsersGroups() {
   const [editGroup, setEditGroup] = useState<{ id?: string; name: string; description: string; policy_id: string } | null>(null);
   const [deleteGroup, setDeleteGroup] = useState<Group | null>(null);
   const [search, setSearch] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   const fetchData = useCallback(async () => {
     const [usersRes, groupsRes, polRes, sbRes, assignRes] = await Promise.all([
@@ -47,6 +48,23 @@ export default function UsersGroups() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch('/admin/api/users/sync', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Sync failed' }));
+        alert(err.detail || 'User sync failed');
+        return;
+      }
+      await fetchData();
+    } catch {
+      alert('Failed to connect to the server');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const getUserSandbox = (userId: string) =>
     sandboxes.find((s) => s.user_id === userId && ['ACTIVE', 'READY'].includes(s.state));
@@ -152,8 +170,12 @@ export default function UsersGroups() {
                 className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
               />
             </div>
-            <button className="px-3 py-2 text-sm text-zinc-600 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5" /> Sync Users
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="px-3 py-2 text-sm text-zinc-600 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5${syncing ? ' animate-spin' : ''}`} /> Sync Users
             </button>
           </div>
 
