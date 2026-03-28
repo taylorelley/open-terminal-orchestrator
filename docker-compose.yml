@@ -1,0 +1,57 @@
+services:
+  shellguard:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    container_name: shellguard
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://shellguard:${SG_DB_PASS:-shellguard}@shellguard-db:5432/shellguard
+      - OPENSHELL_GATEWAY=${OPENSHELL_GATEWAY:-http://openshell-gateway:6443}
+      - OPEN_WEBUI_BASE_URL=${OPEN_WEBUI_BASE_URL:-http://open-webui:8080}
+      - OPEN_WEBUI_API_KEY=${OPEN_WEBUI_API_KEY:-}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-}
+      - POOL_WARMUP_SIZE=${POOL_WARMUP_SIZE:-2}
+      - POOL_MAX_SANDBOXES=${POOL_MAX_SANDBOXES:-20}
+      - POOL_MAX_ACTIVE=${POOL_MAX_ACTIVE:-10}
+      - DEFAULT_IMAGE_TAG=${DEFAULT_IMAGE_TAG:-shellguard-sandbox:slim}
+      - IDLE_TIMEOUT=${IDLE_TIMEOUT:-1800}
+      - SUSPEND_TIMEOUT=${SUSPEND_TIMEOUT:-86400}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - shellguard-user-data:/var/lib/shellguard/user-data
+    depends_on:
+      shellguard-db:
+        condition: service_healthy
+    networks:
+      - shellguard-internal
+
+  shellguard-db:
+    image: postgres:16-alpine
+    container_name: shellguard-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=shellguard
+      - POSTGRES_PASSWORD=${SG_DB_PASS:-shellguard}
+      - POSTGRES_DB=shellguard
+    volumes:
+      - shellguard-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shellguard"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - shellguard-internal
+
+volumes:
+  shellguard-db-data:
+  shellguard-user-data:
+
+networks:
+  shellguard-internal:
