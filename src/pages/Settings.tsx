@@ -8,6 +8,7 @@ import {
   Trash2,
   Copy,
   Check,
+  Archive,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Tabs } from '../components/ui/Tabs';
@@ -65,6 +66,7 @@ export default function Settings() {
     { id: '1', name: 'Management API Key', key: 'sg-key-a1b2c3d4e5f6', created_at: new Date(Date.now() - 86400000 * 10).toISOString() },
   ]);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [backingUp, setBackingUp] = useState(false);
 
   const fetchConfig = useCallback(async () => {
     const { data } = await supabase.from('system_config').select('*');
@@ -128,6 +130,25 @@ export default function Settings() {
     a.download = `shellguard-config-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleFullBackup = async () => {
+    setBackingUp(true);
+    try {
+      const res = await fetch('/admin/api/backup', { method: 'POST' });
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename=(.+)/);
+      const filename = match ? match[1] : `shellguard-backup-${Date.now()}.json`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setBackingUp(false);
+    }
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -430,7 +451,22 @@ export default function Settings() {
       {activeTab === 'backup' && (
         <div className="max-w-2xl space-y-6">
           <div className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-900">Export</h3>
+            <h3 className="text-sm font-semibold text-zinc-900">Full Backup</h3>
+            <button
+              onClick={handleFullBackup}
+              disabled={backingUp}
+              className="flex items-center gap-3 p-4 w-full border border-teal-200 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors text-left disabled:opacity-50"
+            >
+              <Archive className="w-5 h-5 text-teal-600" />
+              <div>
+                <p className="text-sm font-medium text-teal-800">{backingUp ? 'Creating Backup...' : 'Download Full Backup'}</p>
+                <p className="text-xs text-teal-600">Policies, versions, assignments, groups, and configuration</p>
+              </div>
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-zinc-900">Export Individual</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={handleExportPolicies}

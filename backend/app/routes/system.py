@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import check_db_connection, get_db
-from app.models import AuditLogEntry, SystemConfig
+from app.models import AuditLogEntry, Group, Policy, PolicyAssignment, PolicyVersion, SystemConfig
 from app.schemas import (
     AuditLogResponse,
     PaginatedResponse,
@@ -249,6 +249,109 @@ def _export_csv(rows: list[AuditLogEntry]) -> StreamingResponse:
 async def get_metrics():
     """Placeholder — Prometheus-format metrics to be implemented."""
     return {"status": "pending", "message": "Prometheus metrics export not yet implemented"}
+
+
+# ---------------------------------------------------------------------------
+# Backup
+# ---------------------------------------------------------------------------
+
+
+@router.post("/backup")
+async def trigger_backup(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Export all policies, policy versions, assignments, groups, and config as a single JSON archive."""
+    policies = (await db.execute(select(Policy))).scalars().all()
+    versions = (await db.execute(select(PolicyVersion).order_by(PolicyVersion.created_at))).scalars().all()
+    assignments = (await db.execute(select(PolicyAssignment))).scalars().all()
+    groups = (await db.execute(select(Group))).scalars().all()
+    config_rows = (await db.execute(select(SystemConfig))).scalars().all()
+
+    backup = {
+        "meta": {
+            "version": "0.1.0",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "type": "shellguard-backup",
+        },
+        "policies": [
+            {
+                "id": str(p.id),
+                "name": p.name,
+                "tier": p.tier,
+                "description": p.description,
+                "current_version": p.current_version,
+                "yaml": p.yaml,
+                "created_at": p.created_at.isoformat(),
+                "updated_at": p.updated_at.isoformat(),
+            }
+            for p in policies
+        ],
+        "policy_versions": [
+            {
+                "id": str(v.id),
+                "policy_id": str(v.policy_id),
+                "version": v.version,
+                "yaml": v.yaml,
+                "changelog": v.changelog,
+                "created_by": str(v.created_by) if v.created_by else None,
+                "created_at": v.created_at.isoformat(),
+            }
+            for v in versions
+        ],
+        "policy_assignments": [
+            {
+                "id": str(a.id),
+                "entity_type": a.entity_type,
+                "entity_id": a.entity_id,
+                "policy_id": str(a.policy_id),
+                "priority": a.priority,
+                "created_by": str(a.created_by) if a.created_by else None,
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in assignments
+        ],
+        "groups": [
+            {
+                "id": str(g.id),
+                "name": g.name,
+                "description": g.description,
+                "policy_id": str(g.policy_id) if g.policy_id else None,
+                "created_at": g.created_at.isoformat(),
+                "updated_at": g.updated_at.isoformat(),
+            }
+            for g in groups
+        ],
+        "system_config": [
+            {
+                "key": c.key,
+                "value": c.value,
+                "updated_at": c.updated_at.isoformat(),
+            }
+            for c in config_rows
+        ],
+    }
+
+    log_admin(
+        db, "backup_created",
+        details={
+            "policies": len(policies),
+            "policy_versions": len(versions),
+            "policy_assignments": len(assignments),
+            "groups": len(groups),
+            "config_entries": len(config_rows),
+        },
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.commit()
+
+    data = json.dumps(backup, indent=2)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename=shellguard-backup-{ts}.json"},
+    )
 
 
 # ---------------------------------------------------------------------------
