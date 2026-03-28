@@ -8,8 +8,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Policy, PolicyAssignment, PolicyVersion
+from app.models import Policy, PolicyAssignment, PolicyVersion, User
 from app.schemas import (
+    DryRunRequest,
     PaginatedResponse,
     PolicyAssignmentCreate,
     PolicyAssignmentResponse,
@@ -26,6 +27,7 @@ from app.services.policy_engine import (
     diff_policy_yaml,
     mark_sandboxes_for_recreation,
     propagate_policy_to_sandboxes,
+    resolve_policy_for_user,
     validate_policy_yaml,
 )
 
@@ -190,6 +192,82 @@ async def upsert_assignment(
 
 
 # ---------------------------------------------------------------------------
+# Policy resolution — must be registered before {policy_id} routes
+# ---------------------------------------------------------------------------
+
+
+async def _determine_resolution_source(
+    user: User,
+    policy: Policy,
+    db: AsyncSession,
+) -> str:
+    """Determine which level of the cascade resolved *policy* for *user*."""
+    # Check user-level assignment
+    row = (
+        await db.execute(
+            select(PolicyAssignment).where(
+                PolicyAssignment.entity_type == "user",
+                PolicyAssignment.entity_id == str(user.id),
+            )
+        )
+    ).scalar_one_or_none()
+    if row and row.policy_id == policy.id:
+        return "user"
+
+    # Check group-level assignment
+    if user.group_id is not None:
+        row = (
+            await db.execute(
+                select(PolicyAssignment).where(
+                    PolicyAssignment.entity_type == "group",
+                    PolicyAssignment.entity_id == str(user.group_id),
+                )
+            )
+        ).scalar_one_or_none()
+        if row and row.policy_id == policy.id:
+            return "group"
+
+    # Check role-level assignment
+    row = (
+        await db.execute(
+            select(PolicyAssignment).where(
+                PolicyAssignment.entity_type == "role",
+                PolicyAssignment.entity_id == user.owui_role,
+            )
+        )
+    ).scalar_one_or_none()
+    if row and row.policy_id == policy.id:
+        return "role"
+
+    return "default"
+
+
+@router.get("/policies/resolve/{uid}")
+async def resolve_user_policy(
+    uid: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolve the effective policy for a user by their Open WebUI user ID."""
+    user = (
+        await db.execute(select(User).where(User.owui_id == uid))
+    ).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    policy = await resolve_policy_for_user(user, db)
+    if not policy:
+        return {"user_id": str(user.id), "owui_id": uid, "policy": None, "source": None}
+
+    source = await _determine_resolution_source(user, policy, db)
+    return {
+        "user_id": str(user.id),
+        "owui_id": uid,
+        "policy": PolicyResponse.model_validate(policy),
+        "source": source,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Per-policy routes (parameterised by {policy_id})
 # ---------------------------------------------------------------------------
 
@@ -334,6 +412,26 @@ async def list_policy_versions(
     return rows
 
 
+@router.get("/policies/{policy_id}/versions/{version}", response_model=PolicyVersionResponse)
+async def get_policy_version(
+    policy_id: uuid.UUID,
+    version: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve a specific version of a policy by version string."""
+    row = (
+        await db.execute(
+            select(PolicyVersion).where(
+                PolicyVersion.policy_id == policy_id,
+                PolicyVersion.version == version,
+            )
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return row
+
+
 @router.get("/policies/{policy_id}/diff", response_model=PolicyDiffResponse)
 async def diff_policy_versions(
     policy_id: uuid.UUID,
@@ -386,4 +484,54 @@ async def validate_policy(
 
     valid, errors = validate_policy_yaml(row.yaml)
     return {"valid": valid, "errors": errors}
+
+
+@router.post("/policies/{policy_id}/dry-run")
+async def dry_run_policy_endpoint(
+    policy_id: uuid.UUID,
+    body: DryRunRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Test a policy against an OpenShell sandbox without applying it."""
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from app.services import openshell_client
+
+    row = (
+        await db.execute(select(Policy).where(Policy.id == policy_id))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Policy not found")
+
+    valid, errors = validate_policy_yaml(row.yaml)
+    if not valid:
+        raise HTTPException(status_code=422, detail={"errors": errors})
+
+    tmp_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            prefix=f"sg-dryrun-{policy_id.hex[:8]}-",
+            suffix=".yaml",
+            delete=False,
+        ) as tmp:
+            tmp.write(row.yaml)
+            tmp_path = tmp.name
+
+        raw = await openshell_client.dry_run_policy(body.sandbox_name, tmp_path)
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            result = {"output": raw}
+
+        return {"policy_id": str(policy_id), "sandbox_name": body.sandbox_name, "result": result}
+
+    except openshell_client.OpenShellError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    finally:
+        if tmp_path is not None:
+            Path(tmp_path).unlink(missing_ok=True)
 

@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # Metrics
     metrics_token: str = ""
 
+    # OpenTelemetry
+    otel_enabled: bool = False
+    otel_endpoint: str = "http://localhost:4317"
+    otel_service_name: str = "shellguard"
+
     # Frontend
     frontend_dist_path: str = "../dist"
 
