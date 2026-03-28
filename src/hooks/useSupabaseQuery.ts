@@ -72,7 +72,9 @@ export function useSupabaseQuery<T>({
 export function useSupabaseRealtime<T>(
   table: string,
   callback: (payload: T) => void
-) {
+): { status: string } {
+  const [status, setStatus] = useState<string>('CONNECTING');
+
   useEffect(() => {
     const channel = supabase
       .channel(`realtime-${table}`)
@@ -83,10 +85,14 @@ export function useSupabaseRealtime<T>(
           callback(payload.new as T);
         }
       )
-      .subscribe();
+      .subscribe((s) => {
+        setStatus(s);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [table, callback]);
+
+  return { status };
 }

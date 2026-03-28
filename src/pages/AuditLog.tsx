@@ -6,6 +6,8 @@ import {
   ChevronDown,
   ChevronUp,
   Calendar,
+  Radio,
+  Circle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSupabaseRealtime } from '../hooks/useSupabaseQuery';
@@ -30,6 +32,15 @@ export default function AuditLog() {
   const [datePreset, setDatePreset] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [counts, setCounts] = useState({ enforcement: 0, lifecycle: 0, admin: 0 });
+  const [streamingEnabled, setStreamingEnabled] = useState(false);
+  const [bufferedCount, setBufferedCount] = useState(0);
+  const [realtimeNewIds, setRealtimeNewIds] = useState<Set<string>>(new Set());
+  const bufferedEntriesRef = useRef<AuditLogEntry[]>([]);
+  const listTopRef = useRef<HTMLDivElement>(null);
+  const newIdTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const isScrolledToTopRef = useRef(true);
+
+  const isPaused = expandedId !== null || search.length > 0;
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -74,40 +85,112 @@ export default function AuditLog() {
   // Keep refs for realtime callback so it always sees current filter state
   const activeTabRef = useRef(activeTab);
   const datePresetRef = useRef(datePreset);
+  const streamingEnabledRef = useRef(streamingEnabled);
+  const isPausedRef = useRef(isPaused);
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
   useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
+  useEffect(() => { streamingEnabledRef.current = streamingEnabled; }, [streamingEnabled]);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+
+  const markNewEntry = useCallback((id: string) => {
+    setRealtimeNewIds((prev) => new Set(prev).add(id));
+    const timer = setTimeout(() => {
+      setRealtimeNewIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      newIdTimersRef.current.delete(id);
+    }, 2000);
+    newIdTimersRef.current.set(id, timer);
+  }, []);
+
+  const flushBuffer = useCallback(() => {
+    const buffered = bufferedEntriesRef.current;
+    if (buffered.length === 0) return;
+    bufferedEntriesRef.current = [];
+    setBufferedCount(0);
+
+    setEntries((prev) => {
+      const existingIds = new Set(prev.map((e) => e.id));
+      const newEntries = buffered.filter((e) => !existingIds.has(e.id));
+      return [...newEntries, ...prev].slice(0, 200);
+    });
+
+    for (const entry of buffered) {
+      markNewEntry(entry.id);
+    }
+  }, [markNewEntry]);
 
   const handleRealtimeInsert = useCallback((entry: AuditLogEntry) => {
     if (!entry || !entry.id) return;
 
-    // Only prepend if the entry matches the active category
-    if (entry.category !== activeTabRef.current) {
-      // Still update counts for other categories
-      setCounts((prev) => ({
-        ...prev,
-        [entry.category]: (prev[entry.category] || 0) + 1,
-      }));
-      return;
-    }
+    // Always update counts
+    setCounts((prev) => ({
+      ...prev,
+      [entry.category]: (prev[entry.category] || 0) + 1,
+    }));
+
+    // Only process entries matching the active category
+    if (entry.category !== activeTabRef.current) return;
 
     // Check if entry falls within the current date range
     const since = Date.now() - DATE_PRESETS[datePresetRef.current].ms;
     if (new Date(entry.timestamp).getTime() < since) return;
 
-    // Prepend, deduplicating by id
+    // When streaming is off, prepend immediately (original behavior)
+    if (!streamingEnabledRef.current) {
+      setEntries((prev) => {
+        if (prev.some((e) => e.id === entry.id)) return prev;
+        return [entry, ...prev].slice(0, 200);
+      });
+      return;
+    }
+
+    // When streaming is on but paused or scrolled away, buffer
+    if (isPausedRef.current || !isScrolledToTopRef.current) {
+      bufferedEntriesRef.current.push(entry);
+      setBufferedCount((prev) => prev + 1);
+      return;
+    }
+
+    // Streaming on, not paused, at top — prepend with highlight
     setEntries((prev) => {
       if (prev.some((e) => e.id === entry.id)) return prev;
       return [entry, ...prev].slice(0, 200);
     });
+    markNewEntry(entry.id);
+  }, [markNewEntry]);
 
-    // Update count for active category
-    setCounts((prev) => ({
-      ...prev,
-      [entry.category]: (prev[entry.category] || 0) + 1,
-    }));
+  const { status: realtimeStatus } = useSupabaseRealtime<AuditLogEntry>('audit_log', handleRealtimeInsert);
+
+  // Flush buffer when unpaused
+  useEffect(() => {
+    if (!isPaused && streamingEnabled) {
+      flushBuffer();
+    }
+  }, [isPaused, streamingEnabled, flushBuffer]);
+
+  // IntersectionObserver for auto-scroll awareness
+  useEffect(() => {
+    if (!listTopRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { isScrolledToTopRef.current = entry.isIntersecting; },
+      { threshold: 0.1 }
+    );
+    observer.observe(listTopRef.current);
+    return () => observer.disconnect();
   }, []);
 
-  useSupabaseRealtime<AuditLogEntry>('audit_log', handleRealtimeInsert);
+  // Cleanup highlight timers on unmount
+  useEffect(() => {
+    const timers = newIdTimersRef.current;
+    return () => {
+      for (const timer of timers.values()) {
+        clearTimeout(timer);
+      }
+    };
+  }, []);
 
   const filtered = entries.filter((e) => {
     if (!search) return true;
@@ -194,6 +277,39 @@ export default function AuditLog() {
           ))}
         </div>
 
+        <button
+          onClick={() => {
+            setStreamingEnabled((prev) => {
+              if (prev) {
+                // Turning off: clear buffer
+                bufferedEntriesRef.current = [];
+                setBufferedCount(0);
+              } else {
+                // Turning on: clear stale highlights
+                setRealtimeNewIds(new Set());
+              }
+              return !prev;
+            });
+          }}
+          className={`px-3 py-2 text-xs font-medium rounded-lg border transition-colors flex items-center gap-1.5 ${
+            streamingEnabled
+              ? 'bg-teal-600 text-white border-teal-600'
+              : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+          }`}
+        >
+          <Radio className="w-3 h-3" />
+          Live
+          {streamingEnabled && realtimeStatus === 'SUBSCRIBED' && (
+            <Circle className="w-1.5 h-1.5 fill-emerald-300 text-emerald-300 animate-pulse" />
+          )}
+          {streamingEnabled && realtimeStatus === 'CHANNEL_ERROR' && (
+            <Circle className="w-1.5 h-1.5 fill-red-400 text-red-400" />
+          )}
+          {streamingEnabled && isPaused && (
+            <span className="text-[10px] opacity-75">(paused)</span>
+          )}
+        </button>
+
         <div className="flex gap-1 ml-auto">
           <button
             onClick={() => handleExport('csv')}
@@ -210,7 +326,16 @@ export default function AuditLog() {
         </div>
       </div>
 
+      <div ref={listTopRef} />
       <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+        {bufferedCount > 0 && (
+          <button
+            onClick={flushBuffer}
+            className="w-full py-2 bg-teal-50 border-b border-teal-200 text-teal-700 text-xs font-medium text-center hover:bg-teal-100 transition-colors"
+          >
+            {bufferedCount} new event{bufferedCount !== 1 ? 's' : ''} — click to show
+          </button>
+        )}
         {loading ? (
           <LoadingState rows={10} />
         ) : filtered.length === 0 ? (
@@ -259,7 +384,7 @@ export default function AuditLog() {
                     <>
                       <tr
                         key={entry.id}
-                        className="hover:bg-zinc-50/50 transition-colors cursor-pointer"
+                        className={`hover:bg-zinc-50/50 transition-colors cursor-pointer ${realtimeNewIds.has(entry.id) ? 'audit-row-new' : ''}`}
                         onClick={() => setExpandedId(isExpanded ? null : entry.id)}
                       >
                         <td className="pl-5 py-3">

@@ -44,4 +44,13 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  @keyframes audit-row-flash {
+    0% { background-color: rgb(204 251 241); }
+    100% { background-color: transparent; }
+  }
+
+  .audit-row-new {
+    animation: audit-row-flash 2s ease-out forwards;
+  }
 }
