@@ -4,7 +4,7 @@ from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, gene
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Group, Policy, Sandbox, User
+from app.models import Group, Policy, Sandbox, SystemConfig, User
 
 # Custom registry — avoids default process/platform collectors.
 REGISTRY = CollectorRegistry()
@@ -73,6 +73,34 @@ REQUEST_LATENCY = Histogram(
     registry=REGISTRY,
 )
 
+SANDBOX_STARTUP_DURATION = Histogram(
+    "shellguard_sandbox_startup_duration_seconds",
+    "Time for a sandbox to transition from WARMING to READY",
+    buckets=(0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
+    registry=REGISTRY,
+)
+
+# ---------------------------------------------------------------------------
+# Gauges (computed at scrape time)
+# ---------------------------------------------------------------------------
+
+POOL_UTILIZATION = Gauge(
+    "shellguard_pool_utilization_ratio",
+    "Ratio of active sandboxes to max_active limit",
+    registry=REGISTRY,
+)
+
+# ---------------------------------------------------------------------------
+# Webhook delivery counter
+# ---------------------------------------------------------------------------
+
+WEBHOOK_DELIVERIES = Counter(
+    "shellguard_webhook_deliveries_total",
+    "Webhook delivery attempts",
+    ["status", "url"],
+    registry=REGISTRY,
+)
+
 # All known sandbox states — used to zero-fill gauges before setting.
 _SANDBOX_STATES = ("POOL", "WARMING", "READY", "ACTIVE", "SUSPENDED", "DESTROYED")
 
@@ -104,6 +132,24 @@ async def collect_db_gauges(db: AsyncSession) -> None:
     group_count = (await db.execute(select(func.count(Group.id)))).scalar_one()
     GROUP_COUNT.set(group_count)
 
+    # Pool utilization (active / max_active)
+    active_count = 0
+    for state, count in (await db.execute(
+        select(Sandbox.state, func.count(Sandbox.id)).group_by(Sandbox.state)
+    )).all():
+        if state == "ACTIVE":
+            active_count = count
+
+    pool_cfg = (
+        await db.execute(select(SystemConfig).where(SystemConfig.key == "pool"))
+    ).scalar_one_or_none()
+    max_active = (
+        int(pool_cfg.value.get("max_active", 0))
+        if pool_cfg and isinstance(pool_cfg.value, dict)
+        else 0
+    )
+    POOL_UTILIZATION.set(active_count / max_active if max_active > 0 else 0.0)
+
 
 def generate_metrics_output() -> str:
     """Return Prometheus exposition format text."""
@@ -113,3 +159,13 @@ def generate_metrics_output() -> str:
 def record_audit_event(category: str, event_type: str) -> None:
     """Increment the audit events counter."""
     AUDIT_EVENTS.labels(category=category, event_type=event_type).inc()
+
+
+def record_startup_duration(seconds: float) -> None:
+    """Observe a sandbox startup duration."""
+    SANDBOX_STARTUP_DURATION.observe(seconds)
+
+
+def record_webhook_delivery(status: str, url: str) -> None:
+    """Increment the webhook delivery counter."""
+    WEBHOOK_DELIVERIES.labels(status=status, url=url).inc()

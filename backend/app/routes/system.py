@@ -18,6 +18,9 @@ from app.schemas import (
     PaginatedResponse,
     SystemConfigResponse,
     SystemConfigUpdate,
+    WebhookConfigCreate,
+    WebhookConfigResponse,
+    WebhookConfigUpdate,
 )
 from app.services.admin_auth import generate_api_key, list_api_keys, require_admin, revoke_api_key
 from app.services.audit_service import log_admin
@@ -238,6 +241,177 @@ def _export_csv(rows: list[AuditLogEntry]) -> StreamingResponse:
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=audit_log.csv"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Webhooks
+# ---------------------------------------------------------------------------
+
+
+async def _load_webhook_list(db: AsyncSession) -> tuple[SystemConfig | None, list[dict]]:
+    """Load the webhooks config row and return the raw list."""
+    row = (
+        await db.execute(
+            select(SystemConfig).where(SystemConfig.key == "webhooks").with_for_update()
+        )
+    ).scalar_one_or_none()
+    if row and isinstance(row.value, dict):
+        return row, row.value.get("webhooks", [])
+    return row, []
+
+
+@router.get("/webhooks", response_model=list[WebhookConfigResponse])
+async def list_webhooks(db: AsyncSession = Depends(get_db)):
+    """List all configured webhooks."""
+    _, wh_list = await _load_webhook_list(db)
+    return [
+        WebhookConfigResponse(index=i, url=w.get("url", ""), enabled=w.get("enabled", True), event_filters=w.get("event_filters", []))
+        for i, w in enumerate(wh_list)
+    ]
+
+
+@router.post("/webhooks", response_model=WebhookConfigResponse, status_code=201)
+async def create_webhook(
+    body: WebhookConfigCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a new webhook configuration."""
+    from app.services.webhook_service import invalidate_cache
+
+    row, wh_list = await _load_webhook_list(db)
+    new_entry = body.model_dump()
+    wh_list.append(new_entry)
+    now = datetime.now(timezone.utc)
+
+    if row:
+        row.value = {"webhooks": wh_list}
+        row.updated_at = now
+    else:
+        row = SystemConfig(key="webhooks", value={"webhooks": wh_list}, updated_at=now)
+        db.add(row)
+
+    log_admin(
+        db, "webhook_created",
+        details={"url": body.url, "index": len(wh_list) - 1},
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.flush()
+    invalidate_cache()
+    return WebhookConfigResponse(
+        index=len(wh_list) - 1,
+        url=body.url,
+        enabled=body.enabled,
+        event_filters=[f.model_dump() for f in body.event_filters],
+    )
+
+
+@router.put("/webhooks/{index}", response_model=WebhookConfigResponse)
+async def update_webhook(
+    index: int,
+    body: WebhookConfigUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a webhook configuration by index."""
+    from app.services.webhook_service import invalidate_cache
+
+    row, wh_list = await _load_webhook_list(db)
+    if index < 0 or index >= len(wh_list):
+        raise HTTPException(status_code=404, detail="Webhook index out of range")
+
+    existing = wh_list[index]
+    updates = body.model_dump(exclude_unset=True)
+    if "event_filters" in updates and updates["event_filters"] is not None:
+        updates["event_filters"] = [f.model_dump() if hasattr(f, "model_dump") else f for f in updates["event_filters"]]
+    existing.update(updates)
+    wh_list[index] = existing
+
+    row.value = {"webhooks": wh_list}
+    row.updated_at = datetime.now(timezone.utc)
+
+    log_admin(
+        db, "webhook_updated",
+        details={"index": index, "url": existing.get("url")},
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.flush()
+    invalidate_cache()
+    return WebhookConfigResponse(
+        index=index,
+        url=existing.get("url", ""),
+        enabled=existing.get("enabled", True),
+        event_filters=existing.get("event_filters", []),
+    )
+
+
+@router.delete("/webhooks/{index}")
+async def delete_webhook(
+    index: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove a webhook configuration by index."""
+    from app.services.webhook_service import invalidate_cache
+
+    row, wh_list = await _load_webhook_list(db)
+    if index < 0 or index >= len(wh_list):
+        raise HTTPException(status_code=404, detail="Webhook index out of range")
+
+    removed = wh_list.pop(index)
+    row.value = {"webhooks": wh_list}
+    row.updated_at = datetime.now(timezone.utc)
+
+    log_admin(
+        db, "webhook_deleted",
+        details={"index": index, "url": removed.get("url")},
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.flush()
+    invalidate_cache()
+    return {"status": "deleted", "index": index}
+
+
+@router.post("/webhooks/{index}/test")
+async def test_webhook(
+    index: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a test event to a specific webhook."""
+    from app.services.webhook_service import WebhookConfig, _deliver
+
+    _, wh_list = await _load_webhook_list(db)
+    if index < 0 or index >= len(wh_list):
+        raise HTTPException(status_code=404, detail="Webhook index out of range")
+
+    wh = WebhookConfig(**wh_list[index])
+    payload = {
+        "event_type": "test",
+        "category": "admin",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "details": {"message": "This is a test webhook from ShellGuard"},
+    }
+    await _deliver(wh, payload)
+    return {"status": "sent", "url": wh.url}
+
+
+# ---------------------------------------------------------------------------
+# Syslog
+# ---------------------------------------------------------------------------
+
+
+@router.post("/syslog/test")
+async def test_syslog():
+    """Send a test syslog message to verify configuration."""
+    from app.services.syslog_service import dispatch_syslog
+
+    await dispatch_syslog(
+        "admin",
+        "test",
+        {"message": "This is a test syslog message from ShellGuard"},
+        datetime.now(timezone.utc).isoformat(),
+    )
+    return {"status": "sent"}
 
 
 # ---------------------------------------------------------------------------

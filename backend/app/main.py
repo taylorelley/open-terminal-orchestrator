@@ -25,6 +25,8 @@ from app.routes.users import router as users_router
 from app.services.audit_service import audit_retention_manager
 from app.services.pool_manager import pool_manager
 from app.services.proxy_client import close_client, init_client
+from app.services.syslog_service import syslog_service
+from app.services.webhook_service import webhook_service
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
         logger.warning("Database is not reachable — running in degraded mode")
 
     await init_client()
+    await webhook_service.start()
+    await syslog_service.start()
     await pool_manager.start()
     await audit_retention_manager.start()
 
@@ -49,6 +53,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
 
     await audit_retention_manager.stop()
     await pool_manager.stop()
+    await syslog_service.stop()
+    await webhook_service.stop()
     await close_client()
     await engine.dispose()
     logger.info("ShellGuard stopped")

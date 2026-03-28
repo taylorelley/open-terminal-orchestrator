@@ -21,6 +21,31 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Event dispatch (fire-and-forget to webhooks / syslog)
+# ---------------------------------------------------------------------------
+
+
+def _dispatch_event(category: str, event_type: str, details: dict) -> None:
+    """Schedule async delivery to webhooks and syslog without blocking."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return  # No event loop (e.g. testing without async context)
+
+    ts = datetime.now(timezone.utc).isoformat()
+
+    from app.services.syslog_service import dispatch_syslog
+    from app.services.webhook_service import dispatch_webhooks
+
+    loop.call_soon(
+        lambda: asyncio.ensure_future(dispatch_webhooks(category, event_type, details, ts))
+    )
+    loop.call_soon(
+        lambda: asyncio.ensure_future(dispatch_syslog(category, event_type, details, ts))
+    )
+
+
+# ---------------------------------------------------------------------------
 # Audit log helpers
 # ---------------------------------------------------------------------------
 
@@ -54,6 +79,7 @@ def log_lifecycle(
     )
     db.add(entry)
     record_audit_event("lifecycle", event_type)
+    _dispatch_event("lifecycle", event_type, entry.details)
     return entry
 
 
@@ -81,6 +107,7 @@ def log_enforcement(
     )
     db.add(entry)
     record_audit_event("enforcement", event_type)
+    _dispatch_event("enforcement", event_type, entry.details)
     return entry
 
 
@@ -104,6 +131,7 @@ def log_admin(
     )
     db.add(entry)
     record_audit_event("admin", event_type)
+    _dispatch_event("admin", event_type, entry.details)
     return entry
 
 

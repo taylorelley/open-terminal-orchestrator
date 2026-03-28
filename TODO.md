@@ -222,10 +222,10 @@ All items are independent. 5A should come after Phase 3 artifacts exist.
 - [ ] Open WebUI integration (backend proxy mode, user ID extraction)
 - [ ] OpenShell CLI integration (`openshell sandbox create/suspend/resume/destroy`)
 - [ ] OpenShell policy management (`openshell policy set/get`)
-- [ ] LiteLLM Proxy inference routing (intercept and redirect model API calls)
-- [ ] Prometheus metrics export endpoint
-- [ ] Webhook notifications for lifecycle events
-- [ ] Syslog/SIEM forwarding for audit events
+- [x] LiteLLM Proxy inference routing (intercept and redirect model API calls)
+- [x] Prometheus metrics export endpoint (hardened with startup histograms, pool utilization, webhook counters)
+- [x] Webhook notifications for lifecycle events
+- [x] Syslog/SIEM forwarding for audit events
 
 ## 11. Deployment — P2 (PRD Section 13)
 
