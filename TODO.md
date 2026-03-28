@@ -168,8 +168,8 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 12. Testing — P2
 
-- [ ] Set up test framework (Vitest for frontend, pytest for backend)
-- [ ] Unit tests for policy resolution logic
+- [x] Set up test framework (pytest for backend — Vitest for frontend is future)
+- [x] Unit tests for policy validation and diff logic
 - [ ] Unit tests for sandbox state machine transitions
 - [ ] Integration tests for API proxy routing
 - [ ] Integration tests for management API endpoints
