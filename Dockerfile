@@ -37,4 +37,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD curl -sf http://localhost:8080/health || exit 1
 
-ENTRYPOINT ["shellguard"]
+COPY backend/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]

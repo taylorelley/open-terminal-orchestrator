@@ -14,6 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import check_db_connection, get_db
 from app.models import AuditLogEntry, Group, Policy, PolicyAssignment, PolicyVersion, SystemConfig
 from app.schemas import (
+    AlertRule,
+    AlertsConfigResponse,
+    AlertsConfigUpdate,
     AuditLogResponse,
     PaginatedResponse,
     SystemConfigResponse,
@@ -412,6 +415,55 @@ async def test_syslog():
         datetime.now(timezone.utc).isoformat(),
     )
     return {"status": "sent"}
+
+
+# ---------------------------------------------------------------------------
+# Alerts
+# ---------------------------------------------------------------------------
+
+
+@router.get("/alerts", response_model=AlertsConfigResponse)
+async def get_alerts(db: AsyncSession = Depends(get_db)):
+    """Get the threshold alerts configuration."""
+    row = (
+        await db.execute(select(SystemConfig).where(SystemConfig.key == "alerts"))
+    ).scalar_one_or_none()
+    if not row:
+        return AlertsConfigResponse(rules=[])
+    raw_rules = row.value.get("rules", [])
+    return AlertsConfigResponse(rules=[AlertRule(**r) for r in raw_rules])
+
+
+@router.put("/alerts", response_model=AlertsConfigResponse)
+async def update_alerts(
+    body: AlertsConfigUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update the threshold alerts configuration."""
+    row = (
+        await db.execute(select(SystemConfig).where(SystemConfig.key == "alerts"))
+    ).scalar_one_or_none()
+
+    now = datetime.now(timezone.utc)
+    new_value = {"rules": [r.model_dump() for r in body.rules]}
+
+    if row:
+        old_value = row.value
+        row.value = new_value
+        row.updated_at = now
+    else:
+        old_value = None
+        row = SystemConfig(key="alerts", value=new_value, updated_at=now)
+        db.add(row)
+
+    log_admin(
+        db, "config_change",
+        details={"setting": "alerts", "old_value": old_value, "new_value": new_value},
+        source_ip=request.client.host if request.client else "",
+    )
+    await db.flush()
+    return AlertsConfigResponse(rules=body.rules)
 
 
 # ---------------------------------------------------------------------------

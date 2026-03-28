@@ -319,6 +319,67 @@ class SyslogConfigUpdate(BaseModel):
     app_name: str = "shellguard"
 
 
+# ---------------------------------------------------------------------------
+# Metrics History
+# ---------------------------------------------------------------------------
+
+
+class MetricPointResponse(BaseModel):
+    time: str
+    value: float
+
+
+class MetricHistoryResponse(BaseModel):
+    metric: str
+    range: str
+    points: list[MetricPointResponse]
+
+
+# ---------------------------------------------------------------------------
+# Bulk Sandbox Actions
+# ---------------------------------------------------------------------------
+
+
+class BulkSandboxAction(BaseModel):
+    action: str = Field(description="Action to perform: suspend, resume, or destroy")
+    sandbox_ids: list[uuid.UUID]
+
+
+class BulkSandboxResult(BaseModel):
+    sandbox_id: uuid.UUID
+    status: str
+    error: str | None = None
+
+
+class BulkActionResponse(BaseModel):
+    results: list[BulkSandboxResult]
+    succeeded: int
+    failed: int
+
+
+# ---------------------------------------------------------------------------
+# Alert Rules
+# ---------------------------------------------------------------------------
+
+
+class AlertRule(BaseModel):
+    name: str
+    metric: str
+    operator: str = Field(description="Comparison operator: gt, lt, eq")
+    threshold: float
+    duration_seconds: int = 60
+    webhook_index: int | None = None
+    enabled: bool = True
+
+
+class AlertsConfigResponse(BaseModel):
+    rules: list[AlertRule]
+
+
+class AlertsConfigUpdate(BaseModel):
+    rules: list[AlertRule]
+
+
 class PoolStatusResponse(BaseModel):
     total: int = 0
     active: int = 0

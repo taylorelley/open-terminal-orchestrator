@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shellguard-config
+  namespace: shellguard
+  labels:
+    app.kubernetes.io/name: shellguard
+    app.kubernetes.io/component: config
+data:
+  OPENSHELL_GATEWAY: "http://openshell-gateway:6443"
+  OPEN_WEBUI_BASE_URL: "http://open-webui:8080"
+  POOL_WARMUP_SIZE: "2"
+  POOL_MAX_SANDBOXES: "20"
+  POOL_MAX_ACTIVE: "10"
+  DEFAULT_IMAGE_TAG: "shellguard-sandbox:slim"
+  IDLE_TIMEOUT: "1800"
+  SUSPEND_TIMEOUT: "86400"
+  LOG_LEVEL: "info"

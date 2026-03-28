@@ -11,15 +11,15 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 | Area | Completion | Notes |
 |------|-----------|-------|
-| Frontend UI (Section 8) | ~95% | All pages, components, routing implemented |
-| Database Schema (Section 10) | 100% | All tables, RLS, indexes in place |
+| Frontend UI (Section 8) | 100% | All pages, components, routing, monitoring, bulk actions, DnD implemented |
+| Database Schema (Section 10) | 100% | All tables, RLS, indexes, metric_snapshots in place |
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
-| Management API (Section 9.2) | 100% | All CRUD endpoints implemented |
+| Management API (Section 9.2) | 100% | All CRUD endpoints + bulk actions + metrics history + alerts implemented |
 | Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff all implemented |
-| Sandbox Lifecycle (Section 6) | ~85% | Pool manager, openshell client, lifecycle automation implemented |
-| Integrations (Section 12) | 0% | UI config only, no backend |
-| Deployment (Section 13) | ~50% | Dockerfile + docker-compose + .env.example done; K3s/TLS/migrations remaining |
+| Sandbox Lifecycle (Section 6) | 100% | Pool manager, openshell client, lifecycle automation, metric snapshots implemented |
+| Integrations (Section 12) | ~70% | LiteLLM, Prometheus, webhooks, syslog done; Open WebUI/OpenShell CLI remaining |
+| Deployment (Section 13) | 100% | Docker Compose, K3s, Alembic, TLS guide all done |
 
 ---
 
@@ -203,11 +203,11 @@ All items are independent. 5A should come after Phase 3 artifacts exist.
 - [x] Policy diff view between versions (UI + backend diff endpoint integrated)
 - [x] Real-time streaming mode for audit log (Supabase realtime fully wired)
 - [x] Saved filter presets for audit log
-- [ ] Threshold alerts configuration in monitoring
-- [ ] Terminal embed in sandbox detail panel (operator debugging)
-- [ ] Drag-and-drop policy assignment
-- [ ] Bulk actions on sandbox table (suspend/destroy selected)
-- [ ] Historical trend selector for monitoring charts (1h, 24h, 7d, 30d)
+- [x] Threshold alerts configuration in monitoring
+- [x] Terminal embed in sandbox detail panel (operator debugging)
+- [x] Drag-and-drop policy assignment
+- [x] Bulk actions on sandbox table (suspend/destroy selected)
+- [x] Historical trend selector for monitoring charts (1h, 24h, 7d, 30d)
 
 ## 9. BYOC Sandbox Image — P1 (PRD Section 5.3)
 
@@ -231,10 +231,10 @@ All items are independent. 5A should come after Phase 3 artifacts exist.
 
 - [x] `docker-compose.yml` — reference deployment (orchestrator + PostgreSQL + frontend)
 - [x] `Dockerfile` — ShellGuard orchestrator container (multi-stage: Node + Python)
-- [ ] Kubernetes/K3s manifests for production deployment
+- [x] Kubernetes/K3s manifests for production deployment
 - [x] Environment variable documentation and `.env.example`
-- [ ] Database initialization and migration scripts (for non-Supabase PostgreSQL)
-- [ ] TLS/reverse proxy configuration guide
+- [x] Database initialization and migration scripts (for non-Supabase PostgreSQL)
+- [x] TLS/reverse proxy configuration guide
 
 ## 12. Testing — P2
 
@@ -243,14 +243,14 @@ All items are independent. 5A should come after Phase 3 artifacts exist.
 - [x] Unit tests for sandbox state machine transitions
 - [x] Integration tests for API proxy routing
 - [x] Integration tests for management API endpoints
-- [ ] End-to-end test: user request → sandbox provision → command execution → response
-- [ ] Frontend component tests for critical UI flows
+- [x] End-to-end test: user request → sandbox provision → command execution → response
+- [ ] Frontend component tests for critical UI flows (Vitest setup pending)
 
 ## 13. Documentation — P3
 
-- [ ] Architecture overview with diagrams
-- [ ] Deployment guide (Docker Compose + K3s)
-- [ ] Policy authoring guide with examples
-- [ ] API reference (OpenAPI/Swagger)
-- [ ] Operator runbook (troubleshooting, backup/restore)
-- [ ] Contributing guide
+- [x] Architecture overview with diagrams
+- [x] Deployment guide (Docker Compose + K3s)
+- [x] Policy authoring guide with examples
+- [x] API reference (OpenAPI/Swagger)
+- [x] Operator runbook (troubleshooting, backup/restore)
+- [x] Contributing guide
