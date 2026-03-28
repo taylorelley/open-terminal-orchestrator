@@ -170,7 +170,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 - [x] Set up test framework (pytest for backend — Vitest for frontend is future)
 - [x] Unit tests for policy validation and diff logic
-- [ ] Unit tests for sandbox state machine transitions
+- [x] Unit tests for sandbox state machine transitions
 - [ ] Integration tests for API proxy routing
 - [ ] Integration tests for management API endpoints
 - [ ] End-to-end test: user request → sandbox provision → command execution → response
