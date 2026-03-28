@@ -22,6 +22,7 @@ from app.schemas import (
 )
 from app.services.admin_auth import require_admin
 from app.services.audit_service import log_admin
+from app.services import openshell_client
 from app.services.policy_engine import (
     classify_policy_changes,
     diff_policy_yaml,
@@ -496,8 +497,6 @@ async def dry_run_policy_endpoint(
     import json
     import tempfile
     from pathlib import Path
-
-    from app.services import openshell_client
 
     row = (
         await db.execute(select(Policy).where(Policy.id == policy_id))

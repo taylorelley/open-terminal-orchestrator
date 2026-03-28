@@ -206,6 +206,139 @@ async def dry_run_policy(name: str, policy_file: str) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# GPU device detection & scheduling
+# ---------------------------------------------------------------------------
+
+
+async def detect_gpu_devices() -> list[dict[str, str]]:
+    """Detect available NVIDIA GPU devices on the host.
+
+    Returns a list of dicts with keys: ``index``, ``name``, ``uuid``,
+    ``memory_total``, ``memory_free``.  Returns an empty list if
+    ``nvidia-smi`` is not available or no GPUs are found.
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "nvidia-smi",
+            "--query-gpu=index,name,uuid,memory.total,memory.free",
+            "--format=csv,noheader,nounits",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+        if proc.returncode != 0:
+            return []
+
+        devices: list[dict[str, str]] = []
+        for line in stdout.decode().strip().splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) >= 5:
+                devices.append({
+                    "index": parts[0],
+                    "name": parts[1],
+                    "uuid": parts[2],
+                    "memory_total": parts[3],
+                    "memory_free": parts[4],
+                })
+        return devices
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return []
+
+
+class GpuScheduler:
+    """Simple GPU resource scheduler that tracks device allocations.
+
+    Each sandbox that requests GPU access is assigned to the device with
+    the most free memory.  Allocations are tracked in-memory; the pool
+    manager resets them on restart by scanning active sandboxes.
+    """
+
+    def __init__(self) -> None:
+        self._allocations: dict[str, list[str]] = {}  # device_uuid -> [sandbox_name, ...]
+
+    async def allocate(self, sandbox_name: str) -> str | None:
+        """Allocate a GPU device for *sandbox_name*.
+
+        Returns the device UUID string (e.g. ``GPU-xxxx``) or ``None``
+        if no GPUs are available.
+        """
+        devices = await detect_gpu_devices()
+        if not devices:
+            logger.warning("No GPU devices detected for sandbox %s", sandbox_name)
+            return None
+
+        # Pick the device with the fewest current allocations.
+        best = min(devices, key=lambda d: len(self._allocations.get(d["uuid"], [])))
+        device_uuid = best["uuid"]
+        self._allocations.setdefault(device_uuid, []).append(sandbox_name)
+        logger.info("Allocated GPU %s (%s) to sandbox %s", best["index"], best["name"], sandbox_name)
+        return device_uuid
+
+    def release(self, sandbox_name: str) -> None:
+        """Release any GPU allocation held by *sandbox_name*."""
+        for device_uuid, names in self._allocations.items():
+            if sandbox_name in names:
+                names.remove(sandbox_name)
+                logger.info("Released GPU %s from sandbox %s", device_uuid, sandbox_name)
+                return
+
+    def allocated_count(self) -> int:
+        """Return the total number of active GPU allocations."""
+        return sum(len(names) for names in self._allocations.values())
+
+
+# Module-level GPU scheduler singleton.
+gpu_scheduler = GpuScheduler()
+
+
+async def create_sandbox_with_gpu(
+    name: str | None = None,
+    image_tag: str = "shellguard-sandbox:slim",
+    policy_file: str | None = None,
+    user_data_dir: str | None = None,
+) -> SandboxInfo:
+    """Create a GPU-enabled sandbox with NVIDIA runtime configuration.
+
+    Allocates a GPU device, then calls ``openshell sandbox create`` with
+    the ``--gpu`` flag and ``--runtime nvidia`` plus device environment
+    variables.
+    """
+    if name is None:
+        name = f"sg-gpu-{uuid.uuid4().hex[:8]}"
+
+    device_uuid = await gpu_scheduler.allocate(name)
+    if not device_uuid:
+        raise OpenShellError("No GPU devices available for allocation")
+
+    args = [
+        "sandbox", "create",
+        "--name", name,
+        "--from", image_tag,
+        "--output", "json",
+        "--gpu",
+        "--runtime", "nvidia",
+        "--env", f"NVIDIA_VISIBLE_DEVICES={device_uuid}",
+        "--env", "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
+    ]
+    if policy_file:
+        args.extend(["--policy", policy_file])
+    if user_data_dir:
+        args.extend(["--volume", f"{user_data_dir}:/data"])
+
+    try:
+        raw = await _run_cli(*args, timeout=settings.startup_timeout)
+    except (OpenShellError, asyncio.TimeoutError):
+        gpu_scheduler.release(name)
+        raise
+
+    info = _parse_sandbox_json(raw)
+    if not info.name:
+        info.name = name
+    logger.info("Created GPU sandbox %s (ip=%s, gpu=%s)", info.name, info.internal_ip, device_uuid)
+    return info
+
+
 async def create_provider(
     sandbox_name: str,
     provider_type: str,
