@@ -147,3 +147,68 @@ class TestDeleteGroup:
         resp = await client.delete(f"/admin/api/groups/{uuid.uuid4()}")
 
         assert resp.status_code == 404
+
+
+class TestSetGroupMembers:
+    """R6: PUT /admin/api/groups/{id}/members"""
+
+    @pytest.mark.asyncio
+    async def test_group_not_found(self, client, mock_db):
+        mock_db.execute = AsyncMock(return_value=_make_result_scalar_one_or_none(None))
+
+        resp = await client.put(
+            f"/admin/api/groups/{uuid.uuid4()}/members",
+            json={"user_ids": []},
+        )
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    @patch("app.routes.users.log_admin")
+    async def test_set_members(self, mock_log, client, mock_db, make_group, make_user):
+        g = make_group(name="devs")
+        u1 = make_user(username="alice")
+        u2 = make_user(username="bob")
+
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _make_result_scalar_one_or_none(g),   # group lookup
+                _make_result_scalars_all([]),           # current members (none)
+                _make_result_scalars_all([u1, u2]),     # new members lookup
+            ]
+        )
+
+        resp = await client.put(
+            f"/admin/api/groups/{g.id}/members",
+            json={"user_ids": [str(u1.id), str(u2.id)]},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        assert u1.group_id == g.id
+        assert u2.group_id == g.id
+
+    @pytest.mark.asyncio
+    @patch("app.routes.users.log_admin")
+    async def test_set_empty_members_clears_group(self, mock_log, client, mock_db, make_group, make_user):
+        g = make_group(name="devs")
+        existing_user = make_user(username="charlie")
+        existing_user.group_id = g.id
+
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _make_result_scalar_one_or_none(g),          # group lookup
+                _make_result_scalars_all([existing_user]),     # current members
+                _make_result_scalars_all([]),                  # new members (empty)
+            ]
+        )
+
+        resp = await client.put(
+            f"/admin/api/groups/{g.id}/members",
+            json={"user_ids": []},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json() == []
+        assert existing_user.group_id is None

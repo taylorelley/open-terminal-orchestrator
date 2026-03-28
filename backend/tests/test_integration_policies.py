@@ -322,3 +322,161 @@ class TestPolicyAssignments:
         data = resp.json()
         assert data["entity_type"] == "user"
         assert data["policy_id"] == str(policy_id)
+
+
+class TestGetPolicyVersion:
+    """R4: GET /admin/api/policies/{id}/versions/{v}"""
+
+    @pytest.mark.asyncio
+    async def test_returns_specific_version(self, client, mock_db):
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        policy_id = uuid.uuid4()
+        v = SimpleNamespace(
+            id=uuid.uuid4(),
+            policy_id=policy_id,
+            version="1.0.2",
+            yaml="metadata:\n  name: test\n",
+            changelog="Bugfix",
+            created_by=None,
+            created_at=now,
+            policy=None,
+        )
+        mock_db.execute = AsyncMock(return_value=_make_result_scalar_one_or_none(v))
+
+        resp = await client.get(f"/admin/api/policies/{policy_id}/versions/1.0.2")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["version"] == "1.0.2"
+        assert data["changelog"] == "Bugfix"
+
+    @pytest.mark.asyncio
+    async def test_version_not_found(self, client, mock_db):
+        mock_db.execute = AsyncMock(return_value=_make_result_scalar_one_or_none(None))
+
+        resp = await client.get(f"/admin/api/policies/{uuid.uuid4()}/versions/9.9.9")
+
+        assert resp.status_code == 404
+
+
+class TestResolveUserPolicy:
+    """R5: GET /admin/api/policies/resolve/{uid}"""
+
+    @pytest.mark.asyncio
+    async def test_user_not_found(self, client, mock_db):
+        mock_db.execute = AsyncMock(return_value=_make_result_scalar_one_or_none(None))
+
+        resp = await client.get("/admin/api/policies/resolve/owui-unknown")
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_no_policy_resolved(self, client, mock_db, make_user):
+        user = make_user(owui_id="owui-test123")
+
+        # 1st call: user lookup; remaining calls: assignment lookups (all return None)
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _make_result_scalar_one_or_none(user),  # user lookup
+                _make_result_scalar_one_or_none(None),   # user assignment
+                _make_result_scalar_one_or_none(None),   # role assignment
+                _make_result_scalar_one_or_none(None),   # default policy
+            ]
+        )
+
+        resp = await client.get("/admin/api/policies/resolve/owui-test123")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["owui_id"] == "owui-test123"
+        assert data["policy"] is None
+
+    @pytest.mark.asyncio
+    async def test_resolves_user_level_policy(self, client, mock_db, make_user, make_policy):
+        from datetime import datetime, timezone
+
+        user = make_user(owui_id="owui-resolved")
+        policy = make_policy(name="user-policy")
+
+        assignment = SimpleNamespace(
+            id=uuid.uuid4(),
+            entity_type="user",
+            entity_id=str(user.id),
+            policy_id=policy.id,
+            priority=30,
+            created_by=None,
+            created_at=datetime.now(timezone.utc),
+            policy=policy,
+        )
+
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _make_result_scalar_one_or_none(user),        # user lookup
+                _make_result_scalar_one_or_none(assignment),   # user assignment (resolve)
+                _make_result_scalar_one_or_none(assignment),   # user assignment (source check)
+            ]
+        )
+
+        resp = await client.get("/admin/api/policies/resolve/owui-resolved")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["policy"]["name"] == "user-policy"
+        assert data["source"] == "user"
+
+
+class TestDryRunPolicy:
+    """R3: POST /admin/api/policies/{id}/dry-run"""
+
+    @pytest.mark.asyncio
+    async def test_not_found(self, client, mock_db):
+        mock_db.execute = AsyncMock(return_value=_make_result_scalar_one_or_none(None))
+
+        resp = await client.post(
+            f"/admin/api/policies/{uuid.uuid4()}/dry-run",
+            json={"sandbox_name": "sg-test-1234"},
+        )
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    @patch("app.routes.policies.openshell_client")
+    async def test_successful_dry_run(self, mock_oc, client, mock_db, make_policy):
+        p = make_policy(
+            yaml="metadata:\n  name: test\n  tier: restricted\n  version: '1.0'\nnetwork:\n  default: deny\n",
+        )
+        mock_db.execute = AsyncMock(return_value=_make_result_scalar_one_or_none(p))
+
+        mock_oc.dry_run_policy = AsyncMock(return_value='{"status": "ok", "changes": []}')
+
+        resp = await client.post(
+            f"/admin/api/policies/{p.id}/dry-run",
+            json={"sandbox_name": "sg-test-1234"},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["sandbox_name"] == "sg-test-1234"
+        assert data["result"]["status"] == "ok"
+
+    @pytest.mark.asyncio
+    @patch("app.routes.policies.openshell_client")
+    async def test_dry_run_openshell_error(self, mock_oc, client, mock_db, make_policy):
+        from app.services.openshell_client import OpenShellError
+
+        p = make_policy(
+            yaml="metadata:\n  name: test\n  tier: restricted\n  version: '1.0'\nnetwork:\n  default: deny\n",
+        )
+        mock_db.execute = AsyncMock(return_value=_make_result_scalar_one_or_none(p))
+
+        mock_oc.dry_run_policy = AsyncMock(side_effect=OpenShellError("sandbox unreachable"))
+        mock_oc.OpenShellError = OpenShellError
+
+        resp = await client.post(
+            f"/admin/api/policies/{p.id}/dry-run",
+            json={"sandbox_name": "sg-test-1234"},
+        )
+
+        assert resp.status_code == 502

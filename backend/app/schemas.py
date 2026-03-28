@@ -380,6 +380,14 @@ class AlertsConfigUpdate(BaseModel):
     rules: list[AlertRule]
 
 
+class DryRunRequest(BaseModel):
+    sandbox_name: str = Field(description="Target sandbox to test the policy against")
+
+
+class GroupMembersUpdate(BaseModel):
+    user_ids: list[uuid.UUID]
+
+
 class PoolStatusResponse(BaseModel):
     total: int = 0
     active: int = 0

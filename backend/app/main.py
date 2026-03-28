@@ -29,6 +29,7 @@ from app.services.proxy_client import close_client, init_client
 from app.services.syslog_service import syslog_service
 from app.services.alert_evaluator import alert_evaluator
 from app.services.webhook_service import webhook_service
+from app.telemetry import setup_telemetry, shutdown_telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):  # noqa: ARG001
     """Startup and shutdown lifecycle hooks."""
     setup_logging(settings.log_level)
+    setup_telemetry()
     logger.info("ShellGuard starting", extra={"port": settings.port})
 
     db_ok = await check_db_connection()
@@ -61,6 +63,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     await webhook_service.stop()
     await close_client()
     await engine.dispose()
+    shutdown_telemetry()
     logger.info("ShellGuard stopped")
 
 

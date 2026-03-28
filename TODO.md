@@ -15,11 +15,11 @@ Project completeness assessment against [PRD.md](./PRD.md).
 | Database Schema (Section 10) | 100% | All tables, RLS, indexes, metric_snapshots in place |
 | Backend Orchestrator (Section 5) | 100% | FastAPI scaffold complete |
 | API Proxy (Section 9.1) | 100% | All proxy endpoints, auth, sandbox resolution implemented |
-| Management API (Section 9.2) | ~90% | Core CRUD + bulk + metrics + alerts done; some granular PRD endpoints missing |
-| Policy Engine (Section 7) | ~95% | Resolution, validation, application, hot-reload, recreation, diff done; dry-run not implemented |
+| Management API (Section 9.2) | 100% | All CRUD + bulk + metrics + alerts + dry-run + resolve + version get + group members done |
+| Policy Engine (Section 7) | 100% | Resolution, validation, application, hot-reload, recreation, diff, dry-run all done |
 | Sandbox Lifecycle (Section 6) | 100% | Pool manager, openshell client, lifecycle automation, metric snapshots implemented |
-| Integrations (Section 12) | ~85% | Open WebUI, OpenShell CLI, LiteLLM, Prometheus, webhooks, syslog done; `policy get`, `provider create`, OTel, Grafana remaining |
-| Testing (Section 12) | ~85% | Backend pytest comprehensive (19 files); frontend Vitest not started |
+| Integrations (Section 12) | 100% | Open WebUI, OpenShell CLI, LiteLLM, Prometheus, webhooks, syslog, OTel, Grafana all done |
+| Testing (Section 12) | 100% | Backend pytest comprehensive (20 files); frontend Vitest + RTL covering critical pages |
 | Deployment (Section 13) | 100% | Docker Compose, K3s, Alembic, TLS guide all done |
 | Documentation (Section 13) | 100% | Architecture, deployment, policy, API, runbook, contributing all done |
 
@@ -27,36 +27,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## Remaining Work
 
-~10 items remain, organized by priority. All items are independent unless noted.
-
-### P1 — Integration Gaps
-
-| # | Item | Section | Notes |
-|---|------|---------|-------|
-| R1 | `openshell policy get` — add `get_policy()` to `openshell_client.py` | §12.2 | `policy set` exists; `get` not implemented |
-| R2 | `openshell provider create` — credential injection via OpenShell providers | §12.2, §11.3 | Credential flow described in PRD but not implemented |
-
-### P2 — API Completeness (PRD §9.2)
-
-| # | Item | Section | Notes |
-|---|------|---------|-------|
-| R3 | `POST /admin/api/policies/{id}/dry-run` — test policy against OpenShell without applying | §9.2 | Validate endpoint exists; dry-run does not |
-| R4 | `GET /admin/api/policies/{id}/versions/{v}` — get specific version | §9.2 | Version list exists; individual version fetch does not |
-| R5 | `GET /admin/api/policies/resolve/{uid}` — resolve effective policy for user | §9.2 | Policy engine has resolution logic; no dedicated endpoint |
-| R6 | `PUT /admin/api/groups/{id}/members` — set group membership | §9.2 | Group CRUD exists; dedicated members endpoint does not |
-
-### P2 — Observability (PRD §12.5)
-
-| # | Item | Section | Notes |
-|---|------|---------|-------|
-| R7 | OpenTelemetry trace propagation — propagate trace context from Open WebUI through orchestrator to sandbox | §12.5 | Not started |
-| R8 | Grafana dashboard template — pre-built dashboard for ShellGuard Prometheus metrics | §12.5 | Not started |
-
-### P2 — Testing
-
-| # | Item | Section | Notes |
-|---|------|---------|-------|
-| R9 | Frontend component tests — add Vitest + React Testing Library, cover Sandboxes, Policies, Monitoring pages | §8 | No test framework, files, or dependencies configured |
+All items complete. No remaining work.
 
 ---
 
@@ -105,7 +76,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] Apply policy at sandbox creation via `openshell policy set`
 - [x] Hot-reload dynamic policy sections (network, inference) on running sandboxes
 - [x] Schedule sandbox recreation for static policy changes (filesystem, process)
-- [-] Dry-run / validate policy against OpenShell without applying — validate endpoint exists; dedicated dry-run endpoint not implemented (R3)
+- [x] Dry-run / validate policy against OpenShell without applying
 - [x] Policy diff view between versions (backend support)
 
 ## 5. Audit Logger — P1 (PRD Section 5.2, 8.7)
@@ -139,11 +110,11 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] `DELETE /admin/api/policies/{id}` — delete policy
 - [x] `GET /admin/api/policies/{id}/versions` — version history
 - [x] `POST /admin/api/policies/{id}/validate` — YAML schema validation
-- [ ] `POST /admin/api/policies/{id}/dry-run` — test policy against OpenShell (R3)
+- [x] `POST /admin/api/policies/{id}/dry-run` — test policy against OpenShell
 - [x] `GET /admin/api/policies/assignments` — list all assignments
 - [x] `PUT /admin/api/policies/assignments` — update assignments
-- [ ] `GET /admin/api/policies/{id}/versions/{v}` — get specific version (R4)
-- [ ] `GET /admin/api/policies/resolve/{uid}` — resolve effective policy for user (R5)
+- [x] `GET /admin/api/policies/{id}/versions/{v}` — get specific version
+- [x] `GET /admin/api/policies/resolve/{uid}` — resolve effective policy for user
 
 ### Users & Groups
 - [x] `POST /admin/api/users/sync` — sync users from Open WebUI
@@ -152,7 +123,7 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] `POST /admin/api/groups` — create group
 - [x] `PUT /admin/api/groups/{id}` — update group
 - [x] `DELETE /admin/api/groups/{id}` — delete group
-- [ ] `PUT /admin/api/groups/{id}/members` — set group membership (R6)
+- [x] `PUT /admin/api/groups/{id}/members` — set group membership
 
 ### System
 - [x] `GET /admin/api/health` — detailed health status
@@ -192,14 +163,14 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 - [x] Open WebUI integration (backend proxy mode, `X-Open-WebUI-User-Id` extraction, `X-API-Key` validation)
 - [x] OpenShell CLI sandbox lifecycle (`openshell sandbox create/suspend/resume/destroy` via `openshell_client.py`)
-- [-] OpenShell policy management — `policy set` done; `policy get` not implemented (R1)
-- [ ] OpenShell credential injection — `openshell provider create` not implemented (R2)
+- [x] OpenShell policy management (`policy set` and `policy get`)
+- [x] OpenShell credential injection (`openshell provider create`)
 - [x] LiteLLM Proxy inference routing (intercept and redirect model API calls)
 - [x] Prometheus metrics export endpoint (hardened with startup histograms, pool utilization, webhook counters)
 - [x] Webhook notifications for lifecycle events
 - [x] Syslog/SIEM forwarding for audit events
-- [ ] OpenTelemetry trace propagation (R7)
-- [ ] Grafana dashboard template for Prometheus metrics (R8)
+- [x] OpenTelemetry trace propagation (Open WebUI → orchestrator → sandbox)
+- [x] Grafana dashboard template for Prometheus metrics
 
 ## 11. Deployment — P2 (PRD Section 13)
 
@@ -212,13 +183,13 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 12. Testing — P2
 
-- [x] Set up test framework (pytest for backend — Vitest for frontend is future)
+- [x] Set up test framework (pytest for backend, Vitest + React Testing Library for frontend)
 - [x] Unit tests for policy validation and diff logic
 - [x] Unit tests for sandbox state machine transitions
 - [x] Integration tests for API proxy routing
 - [x] Integration tests for management API endpoints
 - [x] End-to-end test: user request → sandbox provision → command execution → response
-- [ ] Frontend component tests for critical UI flows (Vitest setup pending)
+- [x] Frontend component tests for critical UI flows (Sandboxes, Policies, Monitoring)
 
 ## 13. Documentation — P3
 

@@ -182,3 +182,41 @@ async def set_policy(name: str, policy_file: str) -> None:
     """Apply a policy to a running sandbox via ``openshell policy set``."""
     await _run_cli("policy", "set", "--sandbox", name, "--file", policy_file)
     logger.info("Applied policy to sandbox %s", name)
+
+
+async def get_policy(name: str) -> str:
+    """Retrieve the active policy YAML from a sandbox via ``openshell policy get``.
+
+    Returns the raw YAML string of the policy currently applied to the sandbox.
+    """
+    return await _run_cli("policy", "get", "--sandbox", name, "--output", "yaml")
+
+
+async def dry_run_policy(name: str, policy_file: str) -> str:
+    """Validate a policy against a sandbox without applying it.
+
+    Returns JSON output describing the dry-run result (e.g. what would change).
+    """
+    return await _run_cli(
+        "policy", "set",
+        "--sandbox", name,
+        "--file", policy_file,
+        "--dry-run",
+        "--output", "json",
+    )
+
+
+async def create_provider(
+    sandbox_name: str,
+    provider_type: str,
+    credentials: dict[str, str],
+) -> None:
+    """Inject credentials into a sandbox via ``openshell provider create``."""
+    creds_json = json.dumps(credentials)
+    await _run_cli(
+        "provider", "create",
+        "--sandbox", sandbox_name,
+        "--type", provider_type,
+        "--credentials", creds_json,
+    )
+    logger.info("Created provider '%s' on sandbox %s", provider_type, sandbox_name)
