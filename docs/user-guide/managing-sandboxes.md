@@ -157,14 +157,22 @@ The Dashboard stat card for **Pool Size** shows the current count of POOL + WARM
 
 ## Terminal Access
 
-Active sandboxes include an embedded terminal that administrators can use for debugging and inspection.
+Active sandboxes include a full PTY terminal powered by the [open-terminal](https://github.com/open-webui/open-terminal) package running inside each sandbox container. The admin dashboard provides an xterm.js-based terminal emulator that connects to the sandbox via a bidirectional WebSocket relay.
+
+Terminal features include:
+- Full ANSI color and cursor support (vi, nano, htop, etc.)
+- Automatic terminal resizing to fit the panel
+- Clickable URLs detected in terminal output
+- Copy/paste support
 
 To access a sandbox terminal:
 
 1. Navigate to **Sandboxes > Active**.
 2. Click on a sandbox row to open the detail panel.
 3. Click the **Open Terminal** button.
-4. A terminal emulator opens within the dashboard, connected to the sandbox via WebSocket.
+4. An xterm.js terminal emulator opens within the dashboard, connected to the sandbox's Open Terminal PTY via WebSocket.
+
+Open WebUI users also get terminal access directly through Open WebUI's terminal integration, which connects to ShellGuard's `/ws/terminal` WebSocket endpoint and is transparently routed to their assigned sandbox.
 
 > **Note:** Admin terminal access is logged as an audit event. All commands executed by administrators are recorded separately from user activity.
 

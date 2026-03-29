@@ -1,11 +1,10 @@
 """Sandbox management API routes."""
 
-import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -241,13 +240,14 @@ async def sandbox_terminal(
     websocket: WebSocket,
     sandbox_id: uuid.UUID,
 ):
-    """Bidirectional WebSocket relay to a sandbox's terminal.
+    """Bidirectional WebSocket relay to a sandbox's Open Terminal PTY.
 
     Authentication is via query parameter ``token`` since WebSocket
     connections cannot send custom headers easily.
     """
     from app.config import settings
     from app.database import async_session as _async_session
+    from app.services.ws_relay import relay_websocket
 
     token = websocket.query_params.get("token", "")
     if not token or token != settings.admin_api_key:
@@ -267,39 +267,12 @@ async def sandbox_terminal(
 
     await websocket.accept()
 
-    sandbox_ws_url = f"ws://{row.internal_ip}:{settings.sandbox_port}/ws/terminal"
-    try:
-        import httpx
+    target_url = f"ws://{row.internal_ip}:{settings.sandbox_port}/ws/terminal"
+    extra_headers: dict[str, str] = {}
+    if settings.sandbox_api_key:
+        extra_headers["Authorization"] = f"Bearer {settings.sandbox_api_key}"
 
-        async with httpx.AsyncClient() as client:
-            # Since httpx doesn't support WebSocket, we use a simple HTTP-based
-            # relay pattern. For a real deployment, this would use a native WS library.
-            # Here we simulate the terminal interaction by relaying data.
-            try:
-                while True:
-                    data = await websocket.receive_text()
-                    # Forward command to sandbox via HTTP exec endpoint
-                    resp = await client.post(
-                        f"http://{row.internal_ip}:{settings.sandbox_port}/api/execute",
-                        json={"command": data},
-                        timeout=settings.proxy_timeout,
-                    )
-                    if resp.status_code == 200:
-                        result = resp.json()
-                        output = result.get("output", result.get("stdout", ""))
-                        if output:
-                            await websocket.send_text(output)
-                    else:
-                        await websocket.send_text(f"\r\nError: {resp.status_code}\r\n")
-            except WebSocketDisconnect:
-                pass
-    except Exception:
-        logger.exception("Terminal WebSocket error for sandbox %s", sandbox_id)
-    finally:
-        try:
-            await websocket.close()
-        except Exception:
-            pass
+    await relay_websocket(websocket, target_url, extra_headers=extra_headers)
 
 
 # ---------------------------------------------------------------------------

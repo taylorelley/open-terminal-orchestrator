@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Proxy
     sandbox_port: int = 8000
     proxy_timeout: int = 30
+    sandbox_api_key: str = ""  # OPEN_TERMINAL_API_KEY for sandbox instances
 
     # User data volumes
     user_data_base_dir: str = "/var/lib/shellguard/user-data"

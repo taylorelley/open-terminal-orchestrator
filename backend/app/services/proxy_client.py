@@ -50,12 +50,19 @@ async def close_client() -> None:
 
 
 def _filter_request_headers(request: Request) -> dict[str, str]:
-    """Return request headers safe to forward to the sandbox."""
-    return {
+    """Return request headers safe to forward to the sandbox.
+
+    Strips hop-by-hop headers and replaces the caller's Authorization
+    header with the sandbox API key (if configured).
+    """
+    filtered = {
         k: v
         for k, v in request.headers.items()
-        if k.lower() not in _HOP_BY_HOP
+        if k.lower() not in _HOP_BY_HOP and k.lower() != "authorization"
     }
+    if settings.sandbox_api_key:
+        filtered["authorization"] = f"Bearer {settings.sandbox_api_key}"
+    return filtered
 
 
 def _filter_response_headers(headers: httpx.Headers) -> dict[str, str]:
@@ -71,8 +78,14 @@ async def forward_request(
     request: Request,
     sandbox_ip: str,
     path: str,
+    *,
+    port: int | None = None,
 ) -> StreamingResponse:
     """Forward *request* to the sandbox at *sandbox_ip* and stream back the response.
+
+    Args:
+        port: Override the target port (defaults to ``settings.sandbox_port``).
+              Used by the ``/proxy/{port}/{path}`` service proxy route.
 
     Raises:
         HTTPException(502) — sandbox is unreachable.
@@ -81,7 +94,8 @@ async def forward_request(
     if http_client is None:
         raise HTTPException(status_code=503, detail="Proxy client not initialised")
 
-    target_url = f"http://{sandbox_ip}:{settings.sandbox_port}{path}"
+    target_port = port if port is not None else settings.sandbox_port
+    target_url = f"http://{sandbox_ip}:{target_port}{path}"
     if request.url.query:
         target_url = f"{target_url}?{request.url.query}"
 
