@@ -98,7 +98,7 @@ async def suspend_sandbox(
     row.memory_usage = 0
     row.network_io = 0
     log_admin(
-        db, "policy_change",
+        db, "sandbox_suspended",
         details={"action": "manual_suspend", "sandbox_name": row.name, "sandbox_id": str(sandbox_id)},
         source_ip=request.client.host if request.client else "",
     )
@@ -130,7 +130,7 @@ async def resume_sandbox(
     row.suspended_at = None
     row.last_active_at = datetime.now(timezone.utc)
     log_admin(
-        db, "policy_change",
+        db, "sandbox_resumed",
         details={"action": "manual_resume", "sandbox_name": row.name, "sandbox_id": str(sandbox_id)},
         source_ip=request.client.host if request.client else "",
     )
@@ -162,7 +162,7 @@ async def destroy_sandbox(
     row.memory_usage = 0
     row.network_io = 0
     log_admin(
-        db, "policy_change",
+        db, "sandbox_destroyed",
         details={"action": "manual_destroy", "sandbox_name": row.name, "sandbox_id": str(sandbox_id)},
         source_ip=request.client.host if request.client else "",
     )
@@ -376,7 +376,7 @@ async def bulk_sandbox_action(
                 row.network_io = 0
 
             log_admin(
-                db, "policy_change",
+                db, "bulk_sandbox_action",
                 details={"action": f"bulk_{body.action}", "sandbox_name": row.name, "sandbox_id": str(sandbox_id)},
                 source_ip=request.client.host if request.client else "",
             )

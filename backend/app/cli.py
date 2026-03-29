@@ -144,7 +144,7 @@ def cmd_policy_validate(args: argparse.Namespace) -> None:
             client,
             "POST",
             "/admin/api/policies/validate",
-            json_body={"definition": yaml_content},
+            json_body={"yaml": yaml_content},
         )
     output(data, args.format)
 
@@ -158,8 +158,8 @@ def cmd_policy_diff(args: argparse.Namespace) -> None:
             client, "GET", f"/admin/api/policies/{args.id}/versions/{args.v2}"
         )
 
-    v1_def = v1_data.get("definition", "")
-    v2_def = v2_data.get("definition", "")
+    v1_def = v1_data.get("yaml", "")
+    v2_def = v2_data.get("yaml", "")
 
     diff = difflib.unified_diff(
         v1_def.splitlines(keepends=True),

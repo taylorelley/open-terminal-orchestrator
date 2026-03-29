@@ -110,7 +110,10 @@ export default function Policies() {
     if (!editingPolicy) return;
 
     const parts = editingPolicy.current_version.split('.');
-    const newVersion = `${parts[0]}.${parseInt(parts[1]) + 1}.${parts[2]}`;
+    const major = parts[0] || '0';
+    const minor = parseInt(parts[1] || '0', 10);
+    const patch = parts[2] || '0';
+    const newVersion = `${major}.${minor + 1}.${patch}`;
 
     await supabase.from('policy_versions').insert({
       policy_id: editingPolicy.id,
