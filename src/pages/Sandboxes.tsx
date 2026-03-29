@@ -92,15 +92,18 @@ export default function Sandboxes() {
     if (selectedIds.size === 0) return;
     setBulkLoading(true);
     try {
-      await fetch('/admin/api/sandboxes/bulk', {
+      const res = await fetch('/admin/api/sandboxes/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, sandbox_ids: Array.from(selectedIds) }),
       });
+      if (!res.ok) {
+        console.error('Bulk action failed:', res.status, await res.text().catch(() => ''));
+      }
       setSelectedIds(new Set());
       fetchSandboxes();
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('Bulk action request failed:', err);
     }
     setBulkLoading(false);
   };
@@ -281,7 +284,7 @@ export default function Sandboxes() {
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center">
                             <span className="text-[10px] font-bold text-zinc-600">
-                              {sb.user.username[0].toUpperCase()}
+                              {sb.user.username?.[0]?.toUpperCase() || '?'}
                             </span>
                           </div>
                           <span className="text-sm font-medium text-zinc-900">{sb.user.username}</span>

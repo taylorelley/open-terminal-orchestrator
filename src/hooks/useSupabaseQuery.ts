@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 
 interface QueryResult<T> {
@@ -27,14 +27,26 @@ export function useSupabaseQuery<T>({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
+  const stableFilters = useMemo(
+    () => filters,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtersKey],
+  );
+  const stableOrder = useMemo(
+    () => order,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [order?.column, order?.ascending],
+  );
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     let query = supabase.from(table).select(select);
 
-    if (filters) {
-      for (const f of filters) {
+    if (stableFilters) {
+      for (const f of stableFilters) {
         if (f.operator === 'eq') query = query.eq(f.column, f.value);
         else if (f.operator === 'neq') query = query.neq(f.column, f.value);
         else if (f.operator === 'in') query = query.in(f.column, f.value as unknown[]);
@@ -43,8 +55,8 @@ export function useSupabaseQuery<T>({
       }
     }
 
-    if (order) {
-      query = query.order(order.column, { ascending: order.ascending ?? false });
+    if (stableOrder) {
+      query = query.order(stableOrder.column, { ascending: stableOrder.ascending ?? false });
     }
 
     if (limit) {
@@ -60,7 +72,7 @@ export function useSupabaseQuery<T>({
     }
 
     setLoading(false);
-  }, [table, select, order?.column, order?.ascending, limit, JSON.stringify(filters)]);
+  }, [table, select, stableOrder, limit, stableFilters]);
 
   useEffect(() => {
     fetchData();

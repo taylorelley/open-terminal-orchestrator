@@ -123,21 +123,20 @@ async def _evaluate_rules() -> None:
 async def _fire_alert(db: AsyncSession, rule: dict, value: float) -> None:
     """Dispatch a webhook for a triggered alert."""
     try:
-        from app.services.webhook_service import webhook_service
+        from app.services.webhook_service import dispatch_webhooks
 
-        payload = {
-            "event_type": "threshold_breach",
-            "category": "alert",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "details": {
+        await dispatch_webhooks(
+            category="alert",
+            event_type="threshold_breach",
+            details={
                 "alert_name": rule.get("name"),
                 "metric": rule.get("metric"),
                 "value": value,
                 "threshold": rule.get("threshold"),
                 "operator": rule.get("operator"),
             },
-        }
-        await webhook_service.dispatch_event(payload)
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
     except Exception:
         logger.exception("Failed to dispatch alert webhook for '%s'", rule.get("name"))
 
