@@ -21,7 +21,7 @@ Open Terminal Orchestrator bridges this gap by combining **Open Terminal's REST 
                │  X-Open-WebUI-User-Id header
                v
 ┌──────────────────────────────────────────┐
-│       Open Terminal Orchestrator Orchestrator            │
+│    Open Terminal Orchestrator            │
 │            (FastAPI)                     │
 │                                          │
 │  API Proxy ── Policy Engine              │
