@@ -41,7 +41,7 @@ DELETE /admin/api/auth/keys/{key_id}  Revoke an API key
 
 ## Proxy API (Open Terminal Compatible)
 
-These endpoints mirror the Open Terminal REST API. Open WebUI connects to ShellGuard as if it were a standard Open Terminal instance. Each request is transparently routed to the calling user's sandbox.
+These endpoints mirror the full Open Terminal REST API. Open WebUI connects to ShellGuard as if it were a standard Open Terminal instance. Each request is transparently routed to the calling user's sandbox. ShellGuard uses the [open-terminal](https://github.com/open-webui/open-terminal) Python package for sandbox communication, ensuring full compatibility with Open WebUI's terminal integration.
 
 If the user has no sandbox, one is provisioned from the pre-warmed pool. If the sandbox is suspended, it is resumed (HTTP 202 with `Retry-After` header returned while warming).
 
@@ -72,6 +72,8 @@ PUT    /api/files/{path}             Write a file
 DELETE /api/files/{path}             Delete a file
 POST   /api/files/upload             Upload a file
 GET    /api/files/download/{path}    Download a file
+POST   /api/files/move               Move or rename a file
+POST   /api/files/mkdir              Create a directory
 ```
 
 ### Search
@@ -81,6 +83,41 @@ GET /api/search
 ```
 
 Search files in the user's sandbox.
+
+### Config and Metadata Discovery
+
+```
+GET /api/config     Feature/config discovery (used by Open WebUI)
+GET /system         System information
+GET /info           Environment metadata
+```
+
+### Port Detection and Service Proxy
+
+```
+GET  /api/ports                          Detect listening ports in the sandbox
+ANY  /proxy/{port}/{path}                Reverse proxy to a service on an arbitrary port
+```
+
+The `/proxy/{port}/{path}` endpoint supports all HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD) and forwards requests to the specified port inside the user's sandbox.
+
+### Terminal Sessions
+
+REST endpoints for managing PTY terminal sessions:
+
+```
+GET    /api/terminals                List active PTY sessions
+POST   /api/terminals               Create a new PTY session
+DELETE /api/terminals/{terminal_id}  Delete a PTY session
+```
+
+WebSocket endpoint for interactive PTY sessions:
+
+```
+WS /ws/terminal?user_id=<owui-user-id>
+```
+
+Bidirectional WebSocket relay to the user's sandbox Open Terminal PTY. Open WebUI connects here for interactive terminal sessions. User identity is passed via the `user_id` query parameter.
 
 ### Inference Proxy
 

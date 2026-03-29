@@ -43,6 +43,7 @@ These variables are embedded into the frontend bundle at build time by Vite. The
 |----------|------|---------|-------------|
 | `SANDBOX_PORT` | integer | `8000` | Port that the Open Terminal process listens on inside each sandbox container. ShellGuard's reverse proxy forwards user traffic to this port. |
 | `PROXY_TIMEOUT` | integer | `30` | HTTP proxy timeout in seconds. If a sandbox does not respond within this duration, ShellGuard returns a 504 Gateway Timeout to the client. Increase this value if sandbox startup is slow or if long-running terminal operations are expected. |
+| `SANDBOX_API_KEY` | string | `""` | API key for Open Terminal instances inside sandboxes. ShellGuard injects this as `OPEN_TERMINAL_API_KEY` when creating sandbox containers and includes it as a Bearer token when proxying requests. When empty, sandbox Open Terminal instances run without authentication. Generate a secure value with: `python -c "import secrets; print(secrets.token_urlsafe(32))"`. **Note:** Changing this value requires recreating all running sandboxes. |
 
 ---
 

@@ -122,6 +122,8 @@ async def create_sandbox(
         "--from", image_tag,
         "--output", "json",
     ]
+    if settings.sandbox_api_key:
+        args.extend(["--env", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
     if policy_file:
         args.extend(["--policy", policy_file])
     if user_data_dir:
@@ -321,6 +323,8 @@ async def create_sandbox_with_gpu(
         "--env", f"NVIDIA_VISIBLE_DEVICES={device_uuid}",
         "--env", "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
     ]
+    if settings.sandbox_api_key:
+        args.extend(["--env", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
     if policy_file:
         args.extend(["--policy", policy_file])
     if user_data_dir:
