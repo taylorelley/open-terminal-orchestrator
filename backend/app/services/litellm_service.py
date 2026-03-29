@@ -47,7 +47,7 @@ class ModelRoute:
 class LiteLLMCredentialRouter:
     """Manages credential stripping/injection for LiteLLM proxy requests.
 
-    When a user's inference request flows through ShellGuard:
+    When a user's inference request flows through Open Terminal Orchestrator:
 
     1. **Strip** — Remove any user-supplied API keys from the request
        headers so they never reach the sandbox.

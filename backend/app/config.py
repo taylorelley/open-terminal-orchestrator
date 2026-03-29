@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "postgresql+asyncpg://shellguard:shellguard@localhost:5432/shellguard"
+    database_url: str = "postgresql+asyncpg://oto:oto@localhost:5432/oto"
 
     # External services
     openshell_gateway: str = "http://openshell-gateway:6443"
@@ -27,13 +27,13 @@ class Settings(BaseSettings):
     sandbox_api_key: str = ""  # OPEN_TERMINAL_API_KEY for sandbox instances
 
     # User data volumes
-    user_data_base_dir: str = "/var/lib/shellguard/user-data"
+    user_data_base_dir: str = "/var/lib/oto/user-data"
 
     # Pool defaults (overridden by system_config rows at runtime)
     pool_warmup_size: int = 2
     pool_max_sandboxes: int = 20
     pool_max_active: int = 10
-    default_image_tag: str = "shellguard-sandbox:slim"
+    default_image_tag: str = "oto-sandbox:slim"
 
     # Lifecycle timeouts (seconds)
     idle_timeout: int = 1800  # 30 minutes
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     # OpenTelemetry
     otel_enabled: bool = False
     otel_endpoint: str = "http://localhost:4317"
-    otel_service_name: str = "shellguard"
+    otel_service_name: str = "oto"
 
     # Frontend
     frontend_dist_path: str = "../dist"

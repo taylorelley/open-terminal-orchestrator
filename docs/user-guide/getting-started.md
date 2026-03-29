@@ -1,6 +1,6 @@
-# Getting Started with ShellGuard
+# Getting Started with Open Terminal Orchestrator
 
-This guide walks you through installing ShellGuard, launching the stack, and connecting it to Open WebUI so that users get secure, isolated terminal sandboxes.
+This guide walks you through installing Open Terminal Orchestrator, launching the stack, and connecting it to Open WebUI so that users get secure, isolated terminal sandboxes.
 
 ---
 
@@ -10,8 +10,8 @@ Before you begin, make sure you have:
 
 - **Docker** v24 or later and **Docker Compose** v2.20 or later
 - **OpenShell Gateway** -- the container runtime that provisions sandboxes (see [OpenShell docs](https://github.com/openshell/gateway))
-- **Open WebUI** (optional for initial setup, required for production) -- the chat interface whose terminal sessions ShellGuard secures
-- A machine with at least **2 CPU cores** and **4 GB RAM** for the ShellGuard stack itself (sandbox resources are separate)
+- **Open WebUI** (optional for initial setup, required for production) -- the chat interface whose terminal sessions Open Terminal Orchestrator secures
+- A machine with at least **2 CPU cores** and **4 GB RAM** for the Open Terminal Orchestrator stack itself (sandbox resources are separate)
 - Ports **8080** (dashboard / API) and **5432** (PostgreSQL, if not using managed Supabase) available
 
 ---
@@ -21,8 +21,8 @@ Before you begin, make sure you have:
 Clone the repository and create your environment file:
 
 ```bash
-git clone https://github.com/shellguard/shellguard.git
-cd shellguard
+git clone https://github.com/oto/open-terminal-orchestrator.git
+cd open-terminal-orchestrator
 cp .env.example .env
 ```
 
@@ -34,7 +34,7 @@ Open `.env` in your editor and set the following required variables:
 | `ADMIN_API_KEY` | Secret key for admin API authentication | `sg-k_...` (generate a strong random string) |
 | `VITE_SUPABASE_URL` | Supabase project URL (or local Supabase URL) | `http://localhost:54321` |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anonymous/public key | `eyJhbGciOiJI...` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:password@db:5432/shellguard` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:password@db:5432/oto` |
 | `JWT_SECRET` | Secret for signing JWT tokens | (generate a strong random string) |
 
 Optional but recommended for production:
@@ -61,8 +61,8 @@ docker compose up -d
 
 This starts:
 
-- **shellguard-api** -- FastAPI backend on port 8080
-- **shellguard-frontend** -- React dashboard (served by the API in production, or separate in dev)
+- **oto-api** -- FastAPI backend on port 8080
+- **oto-frontend** -- React dashboard (served by the API in production, or separate in dev)
 - **postgres** -- PostgreSQL database (if using local Supabase)
 - **supabase** -- Supabase services (auth, realtime, REST)
 
@@ -101,22 +101,22 @@ On a fresh installation, create the initial admin account:
 
 ## Step 4: Connect Open WebUI
 
-To route Open WebUI terminal sessions through ShellGuard:
+To route Open WebUI terminal sessions through Open Terminal Orchestrator:
 
 1. In your Open WebUI configuration, set the **terminal integration URL** to:
 
    ```
-   http://shellguard:8080/api/v1/terminal
+   http://oto:8080/api/v1/terminal
    ```
 
-   Replace `shellguard` with the hostname or IP address if Open WebUI and ShellGuard are not on the same Docker network.
+   Replace `oto` with the hostname or IP address if Open WebUI and Open Terminal Orchestrator are not on the same Docker network.
 
-2. Open WebUI sends an `X-Open-WebUI-User-Id` header with each terminal request. ShellGuard uses this header to:
+2. Open WebUI sends an `X-Open-WebUI-User-Id` header with each terminal request. Open Terminal Orchestrator uses this header to:
    - Identify the requesting user
    - Look up their policy assignment (user-specific, group, role, or system default)
    - Provision or reuse a sandbox matching that policy
 
-3. If you are using OIDC, ensure both Open WebUI and ShellGuard are configured with the same identity provider so that user IDs are consistent.
+3. If you are using OIDC, ensure both Open WebUI and Open Terminal Orchestrator are configured with the same identity provider so that user IDs are consistent.
 
 ### Docker Network Setup
 
@@ -127,17 +127,17 @@ If both services run via Docker Compose, add them to a shared network:
 services:
   open-webui:
     networks:
-      - shellguard-net
+      - oto-net
 
 networks:
-  shellguard-net:
+  oto-net:
     external: true
 ```
 
 Create the network if it does not exist:
 
 ```bash
-docker network create shellguard-net
+docker network create oto-net
 ```
 
 ---
@@ -146,14 +146,14 @@ docker network create shellguard-net
 
 1. Open Open WebUI in your browser and start a new chat session.
 2. Trigger a terminal session (e.g., ask the model to run a shell command).
-3. Switch to the ShellGuard admin dashboard at `http://localhost:8080`.
+3. Switch to the Open Terminal Orchestrator admin dashboard at `http://localhost:8080`.
 4. Navigate to **Sandboxes** in the sidebar.
 5. You should see a new sandbox in the **Active** tab with the user's ID, assigned policy, and resource metrics.
 
 If the sandbox does not appear:
 
-- Check the ShellGuard API logs: `docker compose logs shellguard-api`
-- Verify the OpenShell Gateway is reachable from the ShellGuard container
+- Check the Open Terminal Orchestrator API logs: `docker compose logs oto-api`
+- Verify the OpenShell Gateway is reachable from the Open Terminal Orchestrator container
 - Confirm the `X-Open-WebUI-User-Id` header is being sent (check Open WebUI logs)
 - See the [Troubleshooting guide](../operations/troubleshooting.md) for additional diagnostics
 
@@ -161,7 +161,7 @@ If the sandbox does not appear:
 
 ## What's Next
 
-Now that ShellGuard is running and connected, explore these guides:
+Now that Open Terminal Orchestrator is running and connected, explore these guides:
 
 - [Dashboard Overview](dashboard-overview.md) -- Learn the admin interface
 - [Managing Sandboxes](managing-sandboxes.md) -- Understand sandbox lifecycle and operations

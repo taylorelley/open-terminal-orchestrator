@@ -1,20 +1,20 @@
 # Managing Users & Groups
 
-ShellGuard synchronizes users from Open WebUI and provides group-based organization and policy assignment. This guide covers the user directory, group management, and the policy resolution system.
+Open Terminal Orchestrator synchronizes users from Open WebUI and provides group-based organization and policy assignment. This guide covers the user directory, group management, and the policy resolution system.
 
 ---
 
 ## User Sync from Open WebUI
 
-ShellGuard does not maintain its own user registration. Instead, it synchronizes user records from Open WebUI to ensure that every person who can request a terminal session has a corresponding ShellGuard identity.
+Open Terminal Orchestrator does not maintain its own user registration. Instead, it synchronizes user records from Open WebUI to ensure that every person who can request a terminal session has a corresponding Open Terminal Orchestrator identity.
 
 ### Automatic Sync
 
 User records are synchronized automatically in two ways:
 
-1. **On first terminal request** -- When a user triggers a terminal session in Open WebUI, the `X-Open-WebUI-User-Id` header is sent to ShellGuard. If no matching user record exists, ShellGuard queries the Open WebUI API to fetch the user's profile (name, email, role) and creates a local record.
+1. **On first terminal request** -- When a user triggers a terminal session in Open WebUI, the `X-Open-WebUI-User-Id` header is sent to Open Terminal Orchestrator. If no matching user record exists, Open Terminal Orchestrator queries the Open WebUI API to fetch the user's profile (name, email, role) and creates a local record.
 
-2. **Periodic background sync** -- A background job runs on a configurable interval (default: every 15 minutes) to pull new and updated users from Open WebUI. This ensures the ShellGuard user directory stays current even for users who have not yet requested a terminal session.
+2. **Periodic background sync** -- A background job runs on a configurable interval (default: every 15 minutes) to pull new and updated users from Open WebUI. This ensures the Open Terminal Orchestrator user directory stays current even for users who have not yet requested a terminal session.
 
 ### Manual Sync
 
@@ -26,10 +26,10 @@ To trigger an immediate sync:
 
 ### Sync Behavior
 
-- New users from Open WebUI are created in ShellGuard with the **pending** role by default, regardless of their Open WebUI role.
+- New users from Open WebUI are created in Open Terminal Orchestrator with the **pending** role by default, regardless of their Open WebUI role.
 - Existing users have their **name** and **email** updated if changed in Open WebUI.
-- Users deleted in Open WebUI are not automatically removed from ShellGuard. An admin must manually deactivate or delete them.
-- The sync does not overwrite ShellGuard-specific fields (role, group membership, policy assignments).
+- Users deleted in Open WebUI are not automatically removed from Open Terminal Orchestrator. An admin must manually deactivate or delete them.
+- The sync does not overwrite Open Terminal Orchestrator-specific fields (role, group membership, policy assignments).
 
 ---
 
@@ -43,7 +43,7 @@ The user directory is a searchable, sortable table of all known users.
 |--------|-------------|
 | **Name** | User's display name (synced from Open WebUI) |
 | **Email** | User's email address |
-| **Role** | ShellGuard role: `admin`, `user`, or `pending` |
+| **Role** | Open Terminal Orchestrator role: `admin`, `user`, or `pending` |
 | **Group** | Group(s) the user belongs to |
 | **Policy** | Directly assigned policy, if any (overrides group/role default) |
 | **Last Active** | Timestamp of the user's most recent terminal session |
@@ -70,11 +70,11 @@ Click a user row to open a slide-out detail panel showing:
 
 ## Roles
 
-ShellGuard uses three roles to control access and defaults:
+Open Terminal Orchestrator uses three roles to control access and defaults:
 
 | Role | Description |
 |------|-------------|
-| **admin** | Full access to the ShellGuard dashboard. Can manage all users, groups, policies, and system settings. Can access any sandbox terminal. |
+| **admin** | Full access to the Open Terminal Orchestrator dashboard. Can manage all users, groups, policies, and system settings. Can access any sandbox terminal. |
 | **user** | Standard role for terminal consumers. Cannot access the admin dashboard. Terminal sessions are governed by their assigned policy. |
 | **pending** | Default role for newly synced users. Pending users cannot create terminal sessions until an admin promotes them to `user` or `admin`. |
 
@@ -177,7 +177,7 @@ Role defaults are configured in **Settings > Policies**:
 
 ## Policy Resolution Precedence
 
-When a user requests a terminal session, ShellGuard determines the effective policy using the following precedence order (highest to lowest):
+When a user requests a terminal session, Open Terminal Orchestrator determines the effective policy using the following precedence order (highest to lowest):
 
 ```
 1. User-level override  (direct assignment to the specific user)

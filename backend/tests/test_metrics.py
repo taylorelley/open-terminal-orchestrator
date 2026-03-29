@@ -23,13 +23,13 @@ class TestMetricRegistrations:
         return [m.name for m in REGISTRY.collect()]
 
     def test_sandbox_startup_duration_registered(self):
-        assert "shellguard_sandbox_startup_duration_seconds" in self._metric_names()
+        assert "oto_sandbox_startup_duration_seconds" in self._metric_names()
 
     def test_pool_utilization_registered(self):
-        assert "shellguard_pool_utilization_ratio" in self._metric_names()
+        assert "oto_pool_utilization_ratio" in self._metric_names()
 
     def test_webhook_deliveries_registered(self):
-        assert "shellguard_webhook_deliveries" in self._metric_names()
+        assert "oto_webhook_deliveries" in self._metric_names()
 
 
 class TestHelpers:

@@ -1,6 +1,6 @@
 # Authentication
 
-ShellGuard supports multiple authentication methods to secure the admin dashboard and management API. This guide covers setup and best practices for each method.
+Open Terminal Orchestrator supports multiple authentication methods to secure the admin dashboard and management API. This guide covers setup and best practices for each method.
 
 ---
 
@@ -36,7 +36,7 @@ Local authentication uses Supabase's built-in email/password provider. This is t
    VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
    ```
 
-4. **Create the first admin user.** Navigate to the ShellGuard login page and use the signup form, or create the user directly in the Supabase dashboard under **Authentication > Users**.
+4. **Create the first admin user.** Navigate to the Open Terminal Orchestrator login page and use the signup form, or create the user directly in the Supabase dashboard under **Authentication > Users**.
 
 5. **Restrict signups** (recommended for production). After creating admin accounts, disable public signups in the Supabase dashboard under **Authentication > Settings > User Signups** or by setting the `GOTRUE_DISABLE_SIGNUP=true` environment variable in a self-hosted Supabase instance.
 
@@ -62,7 +62,7 @@ For production deployments, configure an external identity provider (IdP) via Op
    |-----------|-------|
    | Client type | Confidential |
    | Redirect URI | `https://<your-supabase-url>/auth/v1/callback` |
-   | Post-logout redirect URI | `https://<your-shellguard-domain>/login` |
+   | Post-logout redirect URI | `https://<your-oto-domain>/login` |
    | Scopes | `openid email profile` |
 
 2. **Configure Supabase** with the OIDC provider details. In the Supabase dashboard, go to **Authentication > Providers** and add a new provider (or use the generic OIDC option). You will need:
@@ -82,10 +82,10 @@ For production deployments, configure an external identity provider (IdP) via Op
 2. Fill in the provider settings:
 
    ```
-   Name:             ShellGuard
+   Name:             Open Terminal Orchestrator
    Authorization URL: (auto-filled)
    Client type:       Confidential
-   Client ID:         shellguard-dashboard
+   Client ID:         oto-dashboard
    Client Secret:     (generated)
    Redirect URIs:     https://<supabase-url>/auth/v1/callback
    Scopes:            openid email profile
@@ -98,12 +98,12 @@ For production deployments, configure an external identity provider (IdP) via Op
 
    ```
    Provider name:    Authentik
-   Client ID:        shellguard-dashboard
+   Client ID:        oto-dashboard
    Client Secret:    <from step 2>
-   Issuer URL:       https://authentik.example.com/application/o/shellguard/
+   Issuer URL:       https://authentik.example.com/application/o/oto/
    ```
 
-5. The discovery URL is: `https://authentik.example.com/application/o/shellguard/.well-known/openid-configuration`
+5. The discovery URL is: `https://authentik.example.com/application/o/oto/.well-known/openid-configuration`
 
 ### Keycloak Example
 
@@ -112,7 +112,7 @@ For production deployments, configure an external identity provider (IdP) via Op
 1. In Keycloak, create a new **Client** under your realm:
 
    ```
-   Client ID:          shellguard-dashboard
+   Client ID:          oto-dashboard
    Client Protocol:    openid-connect
    Access Type:        confidential
    Valid Redirect URIs: https://<supabase-url>/auth/v1/callback
@@ -124,7 +124,7 @@ For production deployments, configure an external identity provider (IdP) via Op
 
    ```
    Provider name:    Keycloak
-   Client ID:        shellguard-dashboard
+   Client ID:        oto-dashboard
    Client Secret:    <from step 2>
    Issuer URL:       https://keycloak.example.com/realms/your-realm
    ```
@@ -133,13 +133,13 @@ For production deployments, configure an external identity provider (IdP) via Op
 
 ### Mapping Roles
 
-By default, any user who authenticates via OIDC receives access to the ShellGuard dashboard. To restrict access, configure your IdP to include a `role` or `groups` claim in the ID token and add a Supabase Auth hook or RLS policy to enforce it.
+By default, any user who authenticates via OIDC receives access to the Open Terminal Orchestrator dashboard. To restrict access, configure your IdP to include a `role` or `groups` claim in the ID token and add a Supabase Auth hook or RLS policy to enforce it.
 
 ---
 
 ## API Key Authentication
 
-The `ADMIN_API_KEY` environment variable enables token-based authentication for the ShellGuard management API. This is intended for automation, scripts, and CI/CD pipelines -- not for interactive dashboard use.
+The `ADMIN_API_KEY` environment variable enables token-based authentication for the Open Terminal Orchestrator management API. This is intended for automation, scripts, and CI/CD pipelines -- not for interactive dashboard use.
 
 ### Setup
 
@@ -155,7 +155,7 @@ The `ADMIN_API_KEY` environment variable enables token-based authentication for 
    ADMIN_API_KEY=sg-admin-AbCdEfGhIjKlMnOpQrStUvWxYz012345
    ```
 
-3. Restart the ShellGuard backend.
+3. Restart the Open Terminal Orchestrator backend.
 
 ### Usage
 
@@ -163,7 +163,7 @@ Include the API key in the `Authorization` header:
 
 ```bash
 curl -H "Authorization: Bearer sg-admin-AbCdEfGhIjKlMnOpQrStUvWxYz012345" \
-     https://shellguard.example.com/api/v1/admin/sandboxes
+     https://oto.example.com/api/v1/admin/sandboxes
 ```
 
 ### Scope
@@ -207,7 +207,7 @@ A user can have multiple active sessions (e.g., different browsers or tabs). Eac
 ### API Keys
 
 - **Rotate API keys regularly.** Change `ADMIN_API_KEY` at least quarterly.
-- **Use separate keys per integration.** If multiple systems call the ShellGuard API, issue distinct keys by deploying separate ShellGuard instances or implementing a key management layer.
+- **Use separate keys per integration.** If multiple systems call the Open Terminal Orchestrator API, issue distinct keys by deploying separate Open Terminal Orchestrator instances or implementing a key management layer.
 - **Never log API keys.** Ensure your reverse proxy and application logs redact `Authorization` headers.
 - **Disable when not needed.** If no automation requires API access, leave `ADMIN_API_KEY` empty to close the attack surface.
 
@@ -215,10 +215,10 @@ A user can have multiple active sessions (e.g., different browsers or tabs). Eac
 
 - **Always use HTTPS** in production. Terminate TLS at your reverse proxy (Nginx, Caddy, Traefik).
 - **Restrict CORS origins.** Replace the default `["*"]` in `CORS_ORIGINS` with your actual dashboard domain.
-- **Place the Supabase instance behind a firewall** and only expose the required endpoints to the ShellGuard frontend.
+- **Place the Supabase instance behind a firewall** and only expose the required endpoints to the Open Terminal Orchestrator frontend.
 
 ### Monitoring
 
 - Monitor failed login attempts via the Supabase Auth logs.
 - Set up alerts for unusual API key usage patterns (high request rates, requests from unexpected IPs).
-- Review the ShellGuard audit log for `admin.login` and `admin.api_key_auth` events.
+- Review the Open Terminal Orchestrator audit log for `admin.login` and `admin.api_key_auth` events.

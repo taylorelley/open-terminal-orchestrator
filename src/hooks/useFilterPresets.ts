@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { AuditFilterPreset } from '../types';
 
-const STORAGE_KEY = 'shellguard:audit-filter-presets';
+const STORAGE_KEY = 'oto:audit-filter-presets';
 const MAX_PRESETS = 20;
 
 function loadPresets(): AuditFilterPreset[] {

@@ -1,17 +1,17 @@
-# ShellGuard — Product Requirements Document
+# Open Terminal Orchestrator — Product Requirements Document
 
 **Secure Terminal Orchestration for Open WebUI via OpenShell Sandboxes**
 
 **Version:** 1.0
 **Date:** 2026-03-27
-**Author:** ShellGuard Contributors
+**Author:** Open Terminal Orchestrator Contributors
 **Status:** Draft
 
 ---
 
 ## 1. Executive Summary
 
-ShellGuard is an open-source orchestration layer that provisions and manages per-user secure terminal environments for Open WebUI. It replaces the proprietary Open WebUI Terminals project with a security-first alternative, combining Open Terminal's lightweight REST API with OpenShell's policy-enforced sandbox runtime. Each Open WebUI user receives an isolated, policy-governed container with granular controls over network egress, filesystem access, process privileges, and inference routing — all managed through a dedicated admin web UI.
+Open Terminal Orchestrator is an open-source orchestration layer that provisions and manages per-user secure terminal environments for Open WebUI. It replaces the proprietary Open WebUI Terminals project with a security-first alternative, combining Open Terminal's lightweight REST API with OpenShell's policy-enforced sandbox runtime. Each Open WebUI user receives an isolated, policy-governed container with granular controls over network egress, filesystem access, process privileges, and inference routing — all managed through a dedicated admin web UI.
 
 The project targets self-hosted deployments where AI agents need code execution capabilities but operators require auditable, enforceable constraints on what those agents can touch. It is designed for both personal infrastructure (homelabs, developer workstations) and regulated enterprise environments where formal evidence of access control is required.
 
@@ -37,7 +37,7 @@ Neither approach provides the granular, declarative, auditable access controls t
 
 - **G2 — Declarative policy enforcement:** Administrators define security policies as versioned YAML files controlling network egress (L7), filesystem access, process restrictions, and inference routing. Policies are assignable per user, per group, or per role.
 
-- **G3 — Transparent Open WebUI integration:** ShellGuard presents the standard Open Terminal REST API surface to Open WebUI. No modifications to Open WebUI are required. The system-level Open Terminal integration (admin settings → integrations) connects to ShellGuard as if it were a single Open Terminal instance.
+- **G3 — Transparent Open WebUI integration:** Open Terminal Orchestrator presents the standard Open Terminal REST API surface to Open WebUI. No modifications to Open WebUI are required. The system-level Open Terminal integration (admin settings → integrations) connects to Open Terminal Orchestrator as if it were a single Open Terminal instance.
 
 - **G4 — Management web UI:** A dedicated admin interface for managing sandboxes, policies, user assignments, resource utilisation, and audit logs. Accessible to operators independently of Open WebUI.
 
@@ -55,9 +55,9 @@ Neither approach provides the granular, declarative, auditable access controls t
 
 ### 3.3 Non-Goals
 
-- **NG1:** Modifying or forking Open WebUI itself. ShellGuard operates as an external service.
-- **NG2:** Replacing OpenShell's core sandbox runtime. ShellGuard orchestrates OpenShell; it does not reimplement it.
-- **NG3:** Providing a general-purpose Kubernetes management interface. The management UI is scoped to ShellGuard's domain.
+- **NG1:** Modifying or forking Open WebUI itself. Open Terminal Orchestrator operates as an external service.
+- **NG2:** Replacing OpenShell's core sandbox runtime. Open Terminal Orchestrator orchestrates OpenShell; it does not reimplement it.
+- **NG3:** Providing a general-purpose Kubernetes management interface. The management UI is scoped to Open Terminal Orchestrator's domain.
 - **NG4:** Supporting non-Open-Terminal workloads in v1. The BYOC image is purpose-built for Open Terminal.
 - **NG5:** Multi-cluster or multi-gateway deployments in v1. Single OpenShell gateway only.
 
@@ -67,13 +67,13 @@ Neither approach provides the granular, declarative, auditable access controls t
 
 ### 4.1 Operator / Administrator
 
-Responsible for deploying and configuring ShellGuard, defining security policies, managing user-to-policy assignments, monitoring resource usage, and reviewing audit logs. May be the same person as the Open WebUI admin in smaller deployments.
+Responsible for deploying and configuring Open Terminal Orchestrator, defining security policies, managing user-to-policy assignments, monitoring resource usage, and reviewing audit logs. May be the same person as the Open WebUI admin in smaller deployments.
 
 **Needs:** Policy authoring tools, real-time visibility into sandbox states, resource consumption dashboards, audit log search, ability to terminate or restart sandboxes, bulk user management.
 
 ### 4.2 End User (via Open WebUI)
 
-Uses Open WebUI's terminal integration to run code, manage files, and execute commands within AI-assisted workflows. Unaware of ShellGuard's existence — the experience is identical to connecting to a standard Open Terminal instance.
+Uses Open WebUI's terminal integration to run code, manage files, and execute commands within AI-assisted workflows. Unaware of Open Terminal Orchestrator's existence — the experience is identical to connecting to a standard Open Terminal instance.
 
 **Needs:** Fast sandbox startup (or instant if pre-warmed), persistent files across sessions, responsive terminal, no friction from the security layer.
 
@@ -93,14 +93,14 @@ Reviews policy definitions, audit logs, and enforcement records to verify that A
 ┌──────────────────────────────────────────────────────────────────┐
 │                         Open WebUI                               │
 │          (System-level Terminal integration)                      │
-│          Configured endpoint: http://shellguard:8080             │
+│          Configured endpoint: http://oto:8080             │
 └────────────────────────┬─────────────────────────────────────────┘
                          │
           REST API calls with X-Open-WebUI-User-Id header
                          │
                          ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                    ShellGuard Orchestrator                        │
+│                    Open Terminal Orchestrator Orchestrator                        │
 │                       (FastAPI + Python)                          │
 │                                                                  │
 │  ┌──────────┐ ┌──────────────┐ ┌────────────┐ ┌──────────────┐  │
@@ -115,7 +115,7 @@ Reviews policy definitions, audit logs, and enforcement records to verify that A
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │              Management Web UI (React/TypeScript)           │  │
-│  │              Served at: http://shellguard:8080/admin        │  │
+│  │              Served at: http://oto:8080/admin        │  │
 │  └────────────────────────────────────────────────────────────┘  │
 └────────────────────────┬─────────────────────────────────────────┘
                          │
@@ -165,10 +165,10 @@ Reviews policy definitions, audit logs, and enforcement records to verify that A
 The custom Open Terminal sandbox image is built from Open Terminal's slim variant to minimise attack surface:
 
 ```dockerfile
-# shellguard-sandbox/Dockerfile
+# oto-sandbox/Dockerfile
 FROM ghcr.io/open-webui/open-terminal:slim
 
-LABEL org.opencontainers.image.title="ShellGuard Sandbox"
+LABEL org.opencontainers.image.title="Open Terminal Orchestrator Sandbox"
 LABEL org.opencontainers.image.description="Open Terminal in OpenShell sandbox"
 
 # Health check for pool manager readiness probes
@@ -184,7 +184,7 @@ The image is registered with OpenShell as a local BYOC source:
 
 ```bash
 openshell sandbox create \
-  --from ./shellguard-sandbox/ \
+  --from ./oto-sandbox/ \
   --name <sandbox-name> \
   --policy <policy-file>
 ```
@@ -273,7 +273,7 @@ For deployments requiring additional tooling (Python packages, data science libr
 
 ### 7.1 Policy Definition Schema
 
-Policies are YAML files conforming to the OpenShell policy specification with ShellGuard-specific metadata extensions:
+Policies are YAML files conforming to the OpenShell policy specification with Open Terminal Orchestrator-specific metadata extensions:
 
 ```yaml
 # policies/restricted.yaml
@@ -437,7 +437,7 @@ Policies resolve in the following precedence order (highest wins):
 1. **User-level override** — Explicit policy assigned to a specific user.
 2. **Group-level assignment** — Policy assigned to the user's Open WebUI group.
 3. **Role-level default** — Policy mapped to the user's Open WebUI role (admin, user).
-4. **System default** — Fallback policy defined in ShellGuard configuration.
+4. **System default** — Fallback policy defined in Open Terminal Orchestrator configuration.
 
 ### 7.3 Policy Versioning
 
@@ -449,12 +449,12 @@ All policy definitions are stored with full version history in the state store. 
 
 ### 8.1 Overview
 
-The management UI is a React/TypeScript SPA served at `/admin` on the ShellGuard orchestrator. It communicates with the orchestrator's management API (separate from the Open Terminal proxy API). Authentication is handled via local credentials or SSO (Authentik/OIDC).
+The management UI is a React/TypeScript SPA served at `/admin` on the Open Terminal Orchestrator orchestrator. It communicates with the orchestrator's management API (separate from the Open Terminal proxy API). Authentication is handled via local credentials or SSO (Authentik/OIDC).
 
 ### 8.2 Information Architecture
 
 ```
-ShellGuard Admin
+Open Terminal Orchestrator Admin
 ├── Dashboard
 ├── Sandboxes
 │   ├── Active Sandboxes
@@ -570,13 +570,13 @@ The dashboard is the default landing page providing an at-a-glance operational o
 - Action: assign/change policy override for individual user
 
 **Group Management:**
-- Create/edit/delete groups (ShellGuard-specific, not Open WebUI groups)
+- Create/edit/delete groups (Open Terminal Orchestrator-specific, not Open WebUI groups)
 - Assign users to groups
 - Assign policy to group
 - Groups serve as the primary policy assignment mechanism for multi-user deployments
 
 **Role Mappings:**
-- Map Open WebUI roles (admin, user, pending) to default ShellGuard policies
+- Map Open WebUI roles (admin, user, pending) to default Open Terminal Orchestrator policies
 - Simple table: role → policy dropdown
 
 ### 8.7 Audit Log
@@ -625,7 +625,7 @@ The dashboard is the default landing page providing an at-a-glance operational o
 ### 8.9 Settings
 
 **General Configuration:**
-- ShellGuard instance name, base URL
+- Open Terminal Orchestrator instance name, base URL
 - OpenShell gateway connection details
 - Open WebUI integration endpoint and API key
 - BYOC image registry and tag configuration
@@ -657,7 +657,7 @@ The dashboard is the default landing page providing an at-a-glance operational o
 
 ### 9.1 Proxy API (Open Terminal Compatible)
 
-ShellGuard exposes the full Open Terminal REST API on its root path. Open WebUI connects to this as a standard Open Terminal instance. All endpoints require the `X-Open-WebUI-User-Id` header (injected by Open WebUI's backend proxy mode) or an `Authorization: Bearer <api-key>` header.
+Open Terminal Orchestrator exposes the full Open Terminal REST API on its root path. Open WebUI connects to this as a standard Open Terminal instance. All endpoints require the `X-Open-WebUI-User-Id` header (injected by Open WebUI's backend proxy mode) or an `Authorization: Bearer <api-key>` header.
 
 The proxy transparently forwards requests to the user's assigned sandbox. If the sandbox is not ready, the proxy handles provisioning/resumption and returns appropriate HTTP status codes.
 
@@ -805,7 +805,7 @@ The management API is served under `/admin/api/` and requires admin authenticati
 ### 11.1 Defence in Depth Layers
 
 ```
-Layer 1: ShellGuard Authentication
+Layer 1: Open Terminal Orchestrator Authentication
   └── Open WebUI backend proxy validates user session
   └── Management UI authenticated via OIDC or local credentials
   └── Management API requires admin bearer token
@@ -853,7 +853,7 @@ Layer 6: Credential Isolation
 
 ```
 Admin configures provider    OpenShell injects at    Open Terminal reads
-in ShellGuard settings  ───► sandbox creation via  ──► env var as API key
+in Open Terminal Orchestrator settings  ───► sandbox creation via  ──► env var as API key
                              openshell provider        (never on disk)
                              create --type custom
                              --from-existing
@@ -871,8 +871,8 @@ sandbox agent                engine strips              injects               (O
 ### 12.1 Open WebUI
 
 - **Connection mode:** System-level (admin settings → integrations → Open Terminal)
-- **Endpoint:** `http://shellguard:8080` (the orchestrator's proxy API)
-- **Authentication:** ShellGuard API key configured in Open WebUI admin panel
+- **Endpoint:** `http://oto:8080` (the orchestrator's proxy API)
+- **Authentication:** Open Terminal Orchestrator API key configured in Open WebUI admin panel
 - **User identification:** Open WebUI injects `X-Open-WebUI-User-Id` header in backend proxy mode
 - **No Open WebUI modifications required**
 
@@ -880,7 +880,7 @@ sandbox agent                engine strips              injects               (O
 
 - **Interface:** `openshell` CLI (v1), gateway REST API (future)
 - **Gateway location:** Local Docker container or remote host
-- **Sandbox image:** ShellGuard BYOC image (Open Terminal slim/full)
+- **Sandbox image:** Open Terminal Orchestrator BYOC image (Open Terminal slim/full)
 - **Policy application:** `openshell policy set` and `openshell policy get`
 - **Credential injection:** `openshell provider create`
 
@@ -888,8 +888,8 @@ sandbox agent                engine strips              injects               (O
 
 - **Protocol:** OIDC
 - **Scope:** Management UI and management API authentication
-- **Flow:** Authentik provider configured with ShellGuard as OIDC client
-- **User mapping:** Authentik groups can optionally map to ShellGuard groups
+- **Flow:** Authentik provider configured with Open Terminal Orchestrator as OIDC client
+- **User mapping:** Authentik groups can optionally map to Open Terminal Orchestrator groups
 
 ### 12.4 LiteLLM Proxy
 
@@ -900,8 +900,8 @@ sandbox agent                engine strips              injects               (O
 
 ### 12.5 Observability Stack
 
-- **Prometheus:** ShellGuard exposes `/admin/api/system/metrics` in Prometheus exposition format
-- **Grafana:** Pre-built dashboard template provided for ShellGuard metrics
+- **Prometheus:** Open Terminal Orchestrator exposes `/admin/api/system/metrics` in Prometheus exposition format
+- **Grafana:** Pre-built dashboard template provided for Open Terminal Orchestrator metrics
 - **OpenTelemetry:** Trace context propagated from Open WebUI through orchestrator to sandbox
 - **Log forwarding:** Audit log exportable to syslog or SIEM via webhook
 
@@ -912,22 +912,22 @@ sandbox agent                engine strips              injects               (O
 ### 13.1 Docker Compose (Reference Deployment)
 
 ```yaml
-# docker-compose.shellguard.yml
+# docker-compose.oto.yml
 version: "3.8"
 
 services:
-  shellguard:
-    build: ./shellguard
-    container_name: shellguard
+  oto:
+    build: ./oto
+    container_name: oto
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgresql://shellguard:${SG_DB_PASS}@shellguard-db:5432/shellguard
+      - DATABASE_URL=postgresql://oto:${SG_DB_PASS}@oto-db:5432/oto
       - OPENSHELL_GATEWAY=http://openshell-gateway:6443
       - OPEN_WEBUI_API_KEY=${OWUI_TERMINAL_KEY}
       - ADMIN_API_KEY=${SG_ADMIN_KEY}
-      - AUTHENTIK_ISSUER=https://auth.example.com/application/o/shellguard/
+      - AUTHENTIK_ISSUER=https://auth.example.com/application/o/oto/
       - AUTHENTIK_CLIENT_ID=${SG_OIDC_CLIENT_ID}
       - AUTHENTIK_CLIENT_SECRET=${SG_OIDC_CLIENT_SECRET}
       - LITELLM_PROXY_URL=http://litellm:4000
@@ -939,32 +939,32 @@ services:
     volumes:
       - ./policies:/app/policies:ro
       - /var/run/docker.sock:/var/run/docker.sock
-      - shellguard-data:/data
+      - oto-data:/data
     depends_on:
-      - shellguard-db
+      - oto-db
     networks:
-      - shellguard-internal
+      - oto-internal
       - proxy
 
-  shellguard-db:
+  oto-db:
     image: postgres:16-alpine
-    container_name: shellguard-db
+    container_name: oto-db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=shellguard
+      - POSTGRES_USER=oto
       - POSTGRES_PASSWORD=${SG_DB_PASS}
-      - POSTGRES_DB=shellguard
+      - POSTGRES_DB=oto
     volumes:
-      - shellguard-db:/var/lib/postgresql/data
+      - oto-db:/var/lib/postgresql/data
     networks:
-      - shellguard-internal
+      - oto-internal
 
 volumes:
-  shellguard-data:
-  shellguard-db:
+  oto-data:
+  oto-db:
 
 networks:
-  shellguard-internal:
+  oto-internal:
   proxy:
     external: true
 ```
@@ -1029,7 +1029,7 @@ networks:
 - Settings interface for all configurable parameters
 - Authentik OIDC integration for admin authentication
 
-**Exit criteria:** An operator can manage all aspects of ShellGuard through the web UI without touching the CLI or API directly. Audit logs are queryable and exportable.
+**Exit criteria:** An operator can manage all aspects of Open Terminal Orchestrator through the web UI without touching the CLI or API directly. Audit logs are queryable and exportable.
 
 ### Phase 4 — Observability & Hardening (Weeks 15–18)
 
@@ -1037,7 +1037,7 @@ networks:
 
 **Deliverables:**
 - Prometheus metrics endpoint with comprehensive instrumentation
-- Grafana dashboard template for ShellGuard
+- Grafana dashboard template for Open Terminal Orchestrator
 - OpenTelemetry trace propagation
 - Resource usage monitoring per sandbox
 - Threshold alerting configuration
@@ -1059,8 +1059,8 @@ networks:
 | Q2 | Open WebUI's `X-Open-WebUI-User-Id` header — is this reliably present in system-level terminal proxy mode? | High | Needs verification against Open WebUI source. Fallback: use API key per user. |
 | Q3 | Sandbox cold-start latency — what is the practical time for OpenShell to provision a sandbox from a BYOC image? | Medium | If >10s, pre-warming pool is critical. Benchmark during Phase 1. |
 | Q4 | OpenShell's K3s resource overhead — how much memory/CPU does the gateway itself consume? | Medium | Important for sizing the host. Benchmark during Phase 1. |
-| Q5 | Should ShellGuard support multiple BYOC images simultaneously (e.g., slim for basic users, full for data science users)? | Low | Defer to Phase 2+ based on user feedback. Architecture supports it. |
-| Q6 | Licensing — OpenShell is Apache 2.0, Open Terminal is MIT. ShellGuard should be Apache 2.0 or MIT. | Low | Decision needed before public release. |
+| Q5 | Should Open Terminal Orchestrator support multiple BYOC images simultaneously (e.g., slim for basic users, full for data science users)? | Low | Defer to Phase 2+ based on user feedback. Architecture supports it. |
+| Q6 | Licensing — OpenShell is Apache 2.0, Open Terminal is MIT. Open Terminal Orchestrator should be Apache 2.0 or MIT. | Low | Decision needed before public release. |
 
 ---
 
@@ -1074,7 +1074,7 @@ networks:
 | **Pre-warmed sandbox** | A sandbox that has been created and is running but not yet assigned to a user. Reduces first-access latency. |
 | **Provider** | OpenShell's credential management primitive. Named bundles of secrets injected into sandboxes as environment variables. |
 | **Sandbox** | An isolated container environment managed by OpenShell, running an Open Terminal instance. |
-| **ShellGuard** | The name of this project: the orchestration layer between Open WebUI and OpenShell. |
+| **Open Terminal Orchestrator** | The name of this project: the orchestration layer between Open WebUI and OpenShell. |
 
 ## Appendix B — Reference Links
 

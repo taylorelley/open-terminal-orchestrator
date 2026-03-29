@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     """Startup and shutdown lifecycle hooks."""
     setup_logging(settings.log_level)
     setup_telemetry()
-    logger.info("ShellGuard starting", extra={"port": settings.port})
+    logger.info("Open Terminal Orchestrator starting", extra={"port": settings.port})
 
     db_ok = await check_db_connection()
     if db_ok:
@@ -64,11 +64,11 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     await close_client()
     await engine.dispose()
     shutdown_telemetry()
-    logger.info("ShellGuard stopped")
+    logger.info("Open Terminal Orchestrator stopped")
 
 
 app = FastAPI(
-    title="ShellGuard",
+    title="Open Terminal Orchestrator",
     version="0.1.0",
     docs_url="/docs",
     redoc_url=None,
@@ -126,7 +126,7 @@ else:
 
 
 def run() -> None:
-    """Entry point for the ``shellguard`` console script."""
+    """Entry point for the ``oto`` console script."""
     uvicorn.run(
         "app.main:app",
         host=settings.host,

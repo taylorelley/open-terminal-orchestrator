@@ -1,6 +1,6 @@
-# ShellGuard API Reference
+# Open Terminal Orchestrator API Reference
 
-ShellGuard exposes two API surfaces:
+Open Terminal Orchestrator exposes two API surfaces:
 
 1. **Proxy API** -- Open Terminal-compatible endpoints consumed by Open WebUI (root path)
 2. **Management API** -- Admin endpoints for the dashboard and automation (`/admin/api/`)
@@ -41,7 +41,7 @@ DELETE /admin/api/auth/keys/{key_id}  Revoke an API key
 
 ## Proxy API (Open Terminal Compatible)
 
-These endpoints mirror the full Open Terminal REST API. Open WebUI connects to ShellGuard as if it were a standard Open Terminal instance. Each request is transparently routed to the calling user's sandbox. ShellGuard uses the [open-terminal](https://github.com/open-webui/open-terminal) Python package for sandbox communication, ensuring full compatibility with Open WebUI's terminal integration.
+These endpoints mirror the full Open Terminal REST API. Open WebUI connects to Open Terminal Orchestrator as if it were a standard Open Terminal instance. Each request is transparently routed to the calling user's sandbox. Open Terminal Orchestrator uses the [open-terminal](https://github.com/open-webui/open-terminal) Python package for sandbox communication, ensuring full compatibility with Open WebUI's terminal integration.
 
 If the user has no sandbox, one is provisioned from the pre-warmed pool. If the sandbox is suspended, it is resumed (HTTP 202 with `Retry-After` header returned while warming).
 
@@ -594,7 +594,7 @@ POST /admin/api/webhooks
 
 ```json
 {
-  "url": "https://hooks.example.com/shellguard",
+  "url": "https://hooks.example.com/oto",
   "enabled": true,
   "event_filters": [
     {"category": "lifecycle", "event_type": "sandbox_destroyed"}

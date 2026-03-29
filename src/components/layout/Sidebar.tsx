@@ -39,8 +39,8 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <h1 className="text-sm font-bold tracking-tight truncate">ShellGuard</h1>
-            <p className="text-[10px] text-zinc-500 font-medium">Terminal Orchestration</p>
+            <h1 className="text-sm font-bold tracking-tight truncate">Open Terminal Orchestrator</h1>
+            <p className="text-[10px] text-zinc-500 font-medium">Sandbox Management</p>
           </div>
         )}
       </div>

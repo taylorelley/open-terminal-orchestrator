@@ -182,7 +182,7 @@ class TestBackup:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["meta"]["type"] == "shellguard-backup"
+        assert data["meta"]["type"] == "oto-backup"
         assert len(data["policies"]) == 1
         assert len(data["groups"]) == 1
 

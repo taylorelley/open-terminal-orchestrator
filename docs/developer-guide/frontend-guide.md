@@ -1,10 +1,10 @@
 # Frontend Development Guide
 
-This guide covers the architecture, conventions, and workflows for developing the ShellGuard frontend.
+This guide covers the architecture, conventions, and workflows for developing the Open Terminal Orchestrator frontend.
 
 ## Architecture Overview
 
-The ShellGuard frontend is a React single-page application (SPA) with the following technology stack:
+The Open Terminal Orchestrator frontend is a React single-page application (SPA) with the following technology stack:
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
@@ -219,7 +219,7 @@ All domain types are defined in `src/types/index.ts`. Key entities include:
 |------|-------------|
 | `Policy` | Security policy with YAML definition and versioning |
 | `Sandbox` | Per-user container with lifecycle states |
-| `User` | Open WebUI user synced into ShellGuard |
+| `User` | Open WebUI user synced into Open Terminal Orchestrator |
 | `Group` | User group with optional policy assignment |
 | `PolicyAssignment` | Maps policies to users, groups, or roles |
 | `AuditLogEntry` | Enforcement, lifecycle, and admin events |

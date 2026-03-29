@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This guide covers common issues encountered when operating ShellGuard and how to resolve them.
+This guide covers common issues encountered when operating Open Terminal Orchestrator and how to resolve them.
 
 ## Sandbox Issues
 
@@ -22,7 +22,7 @@ A sandbox that remains in the `WARMING` state indicates the container failed to 
 
 3. Check the sandbox startup logs for errors:
    ```bash
-   docker compose logs shellguard-backend | grep "WARMING"
+   docker compose logs oto-backend | grep "WARMING"
    ```
 
 **Resolution:**
@@ -50,14 +50,14 @@ When a suspended sandbox fails to resume, the user sees a timeout or error when 
 
 3. Check backend logs for resume errors:
    ```bash
-   docker compose logs shellguard-backend | grep "resume"
+   docker compose logs oto-backend | grep "resume"
    ```
 
 **Resolution:**
 
 - Increase `SANDBOX_RESUME_TIMEOUT` if the gateway is slow to restore suspended containers.
 - Verify the gateway health endpoint returns a healthy status.
-- If the underlying container was destroyed externally, the sandbox must be re-created. ShellGuard will handle this automatically on the next user connection if pool replenishment is enabled.
+- If the underlying container was destroyed externally, the sandbox must be re-created. Open Terminal Orchestrator will handle this automatically on the next user connection if pool replenishment is enabled.
 
 ### High Cold-Start Latency
 
@@ -105,7 +105,7 @@ Users are redirected to the identity provider but authentication does not comple
 
 3. Review backend logs for OIDC errors:
    ```bash
-   docker compose logs shellguard-backend | grep -i "oidc\|oauth"
+   docker compose logs oto-backend | grep -i "oidc\|oauth"
    ```
 
 **Resolution:**
@@ -157,14 +157,14 @@ The backend cannot connect to PostgreSQL.
 
 3. If using Docker Compose, check the database container:
    ```bash
-   docker compose ps shellguard-db
-   docker compose logs shellguard-db
+   docker compose ps oto-db
+   docker compose logs oto-db
    ```
 
 **Resolution:**
 
 - Verify `DATABASE_URL` in the backend `.env` file is correct (host, port, database name, credentials).
-- Ensure the database container is running: `docker compose up -d shellguard-db`.
+- Ensure the database container is running: `docker compose up -d oto-db`.
 - Check that the backend container can reach the database host (network configuration, Docker network).
 - Verify PostgreSQL is accepting connections on the configured port and interface.
 
@@ -236,7 +236,7 @@ The API proxy to sandbox terminal endpoints returns gateway errors.
 
 2. Verify the sandbox's internal IP is reachable from the backend:
    ```bash
-   docker compose exec shellguard-backend curl -s http://<SANDBOX_INTERNAL_IP>:<PORT>/health
+   docker compose exec oto-backend curl -s http://<SANDBOX_INTERNAL_IP>:<PORT>/health
    ```
 
 3. Check proxy timeout configuration.
@@ -330,16 +330,16 @@ LOG_LEVEL=debug
 docker compose logs -f
 
 # View specific service logs
-docker compose logs -f shellguard-backend
-docker compose logs -f shellguard-db
+docker compose logs -f oto-backend
+docker compose logs -f oto-db
 
 # Filter for errors
-docker compose logs shellguard-backend 2>&1 | grep -i "error\|exception\|traceback"
+docker compose logs oto-backend 2>&1 | grep -i "error\|exception\|traceback"
 ```
 
 ### Health Check Endpoints
 
-ShellGuard exposes the following health check endpoints:
+Open Terminal Orchestrator exposes the following health check endpoints:
 
 | Endpoint | Description |
 |----------|-------------|
@@ -363,6 +363,6 @@ curl -s http://localhost:8000/health/gateway | jq .
 
 If you are unable to resolve an issue using this guide:
 
-1. Search existing [GitHub Issues](https://github.com/shellguard/shellguard/issues) for similar problems.
+1. Search existing [GitHub Issues](https://github.com/oto/oto/issues) for similar problems.
 2. Collect diagnostic information: backend logs, database state, configuration (redact secrets).
 3. Open a new issue with the diagnostic information and steps to reproduce.

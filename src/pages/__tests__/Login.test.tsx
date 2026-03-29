@@ -25,11 +25,11 @@ describe('Login page', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the ShellGuard title', () => {
+  it('renders the Open Terminal Orchestrator title', () => {
     render(<Login />);
 
-    expect(screen.getByText('ShellGuard')).toBeInTheDocument();
-    expect(screen.getByText('Terminal Orchestration Console')).toBeInTheDocument();
+    expect(screen.getByText('Open Terminal Orchestrator')).toBeInTheDocument();
+    expect(screen.getByText('Sandbox Management Console')).toBeInTheDocument();
   });
 
   it('renders email and password inputs', () => {

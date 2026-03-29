@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide covers how to run tests, write new tests, and validate changes in the ShellGuard project.
+This guide covers how to run tests, write new tests, and validate changes in the Open Terminal Orchestrator project.
 
 ## Quick Reference
 

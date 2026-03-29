@@ -104,7 +104,7 @@ def _parse_sandbox_json(raw: str) -> SandboxInfo:
 
 async def create_sandbox(
     name: str | None = None,
-    image_tag: str = "shellguard-sandbox:slim",
+    image_tag: str = "oto-sandbox:slim",
     policy_file: str | None = None,
     user_data_dir: str | None = None,
     gpu: bool = False,
@@ -296,7 +296,7 @@ gpu_scheduler = GpuScheduler()
 
 async def create_sandbox_with_gpu(
     name: str | None = None,
-    image_tag: str = "shellguard-sandbox:slim",
+    image_tag: str = "oto-sandbox:slim",
     policy_file: str | None = None,
     user_data_dir: str | None = None,
 ) -> SandboxInfo:

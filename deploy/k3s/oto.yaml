@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: shellguard
-  namespace: shellguard
+  name: oto
+  namespace: oto
   labels:
-    app.kubernetes.io/name: shellguard
+    app.kubernetes.io/name: oto
     app.kubernetes.io/component: server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: shellguard
+      app.kubernetes.io/name: oto
       app.kubernetes.io/component: server
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: shellguard
+        app.kubernetes.io/name: oto
         app.kubernetes.io/component: server
     spec:
       initContainers:
         - name: migrate
-          image: shellguard:latest
+          image: oto:latest
           command: ["alembic", "upgrade", "head"]
           envFrom:
             - configMapRef:
-                name: shellguard-config
+                name: oto-config
             - secretRef:
-                name: shellguard-secret
+                name: oto-secret
           resources:
             requests:
               cpu: 50m
@@ -35,20 +35,20 @@ spec:
               cpu: 200m
               memory: 256Mi
       containers:
-        - name: shellguard
-          image: shellguard:latest
+        - name: oto
+          image: oto:latest
           ports:
             - containerPort: 8080
               name: http
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: shellguard-config
+                name: oto-config
             - secretRef:
-                name: shellguard-secret
+                name: oto-secret
           volumeMounts:
             - name: user-data
-              mountPath: /var/lib/shellguard/user-data
+              mountPath: /var/lib/oto/user-data
           livenessProbe:
             httpGet:
               path: /health
@@ -75,4 +75,4 @@ spec:
       volumes:
         - name: user-data
           persistentVolumeClaim:
-            claimName: shellguard-user-data
+            claimName: oto-user-data

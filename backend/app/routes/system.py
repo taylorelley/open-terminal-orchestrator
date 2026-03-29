@@ -392,7 +392,7 @@ async def test_webhook(
         "event_type": "test",
         "category": "admin",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "details": {"message": "This is a test webhook from ShellGuard"},
+        "details": {"message": "This is a test webhook from Open Terminal Orchestrator"},
     }
     await _deliver(wh, payload)
     return {"status": "sent", "url": wh.url}
@@ -411,7 +411,7 @@ async def test_syslog():
     await dispatch_syslog(
         "admin",
         "test",
-        {"message": "This is a test syslog message from ShellGuard"},
+        {"message": "This is a test syslog message from Open Terminal Orchestrator"},
         datetime.now(timezone.utc).isoformat(),
     )
     return {"status": "sent"}
@@ -504,7 +504,7 @@ async def trigger_backup(
         "meta": {
             "version": "0.1.0",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "type": "shellguard-backup",
+            "type": "oto-backup",
         },
         "policies": [
             {
@@ -582,7 +582,7 @@ async def trigger_backup(
     return StreamingResponse(
         iter([data]),
         media_type="application/json",
-        headers={"Content-Disposition": f"attachment; filename=shellguard-backup-{ts}.json"},
+        headers={"Content-Disposition": f"attachment; filename=oto-backup-{ts}.json"},
     )
 
 

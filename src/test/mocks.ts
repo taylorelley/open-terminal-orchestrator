@@ -56,7 +56,7 @@ export function makeSandbox(overrides: Partial<Sandbox> = {}): Sandbox {
     state: 'ACTIVE',
     policy_id: null,
     internal_ip: '10.0.0.1',
-    image_tag: 'shellguard-sandbox:slim',
+    image_tag: 'oto-sandbox:slim',
     gpu_enabled: false,
     cpu_usage: 10,
     memory_usage: 256,

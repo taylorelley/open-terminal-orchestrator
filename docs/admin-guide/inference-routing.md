@@ -1,17 +1,17 @@
 # Inference Routing
 
-This document explains how ShellGuard manages LLM inference traffic flowing through user sandboxes, including credential security, model routing, and policy-based access control.
+This document explains how Open Terminal Orchestrator manages LLM inference traffic flowing through user sandboxes, including credential security, model routing, and policy-based access control.
 
 ## Why Inference Routing Exists
 
-Each ShellGuard sandbox runs an instance of Open Terminal, which provides a REST API for code execution, file management, and terminal access. AI agents operating inside these sandboxes — through Open WebUI's terminal integration — often need to call LLM APIs themselves (e.g., an agent writing code that invokes GPT-4 or Claude).
+Each Open Terminal Orchestrator sandbox runs an instance of Open Terminal, which provides a REST API for code execution, file management, and terminal access. AI agents operating inside these sandboxes — through Open WebUI's terminal integration — often need to call LLM APIs themselves (e.g., an agent writing code that invokes GPT-4 or Claude).
 
 Without inference routing, operators face two bad options:
 
 1. **Let agents use their own keys.** Users or agents supply API keys directly, bypassing any organisational controls over model access, spend, or audit.
 2. **Bake keys into the sandbox image.** Embeds secrets in container images, which is insecure and makes rotation difficult.
 
-ShellGuard's inference routing solves this by intercepting LLM API traffic at the proxy layer, stripping user-supplied credentials, and injecting operator-managed credentials based on policy.
+Open Terminal Orchestrator's inference routing solves this by intercepting LLM API traffic at the proxy layer, stripping user-supplied credentials, and injecting operator-managed credentials based on policy.
 
 ## Architecture
 
@@ -27,7 +27,7 @@ Open WebUI
     │
     ▼
 ┌──────────────────────────────────────────────┐
-│           ShellGuard Proxy Layer              │
+│           Open Terminal Orchestrator Proxy Layer              │
 │                                              │
 │  1. Resolve sandbox   ← lookup alice's       │
 │                         active sandbox        │
@@ -65,7 +65,7 @@ Open WebUI
            └──────────────────┘
 ```
 
-ShellGuard itself never makes LLM calls. It is a credential-routing proxy. The actual API call to the upstream provider happens inside the sandbox's LiteLLM instance.
+Open Terminal Orchestrator itself never makes LLM calls. It is a credential-routing proxy. The actual API call to the upstream provider happens inside the sandbox's LiteLLM instance.
 
 ## Components
 
@@ -214,7 +214,7 @@ litellm_router.register_route(ModelRoute(
 
 ### Admin UI
 
-The LiteLLM Proxy URL is configurable in the admin UI under **Settings > Integrations > LiteLLM Proxy**. This sets the base URL that ShellGuard uses when configuring sandbox-level LiteLLM instances.
+The LiteLLM Proxy URL is configurable in the admin UI under **Settings > Integrations > LiteLLM Proxy**. This sets the base URL that Open Terminal Orchestrator uses when configuring sandbox-level LiteLLM instances.
 
 ## Security Properties
 
@@ -224,17 +224,17 @@ The LiteLLM Proxy URL is configurable in the admin UI under **Settings > Integra
 
 **Model access control.** Only models with registered routes are accessible. Unregistered model aliases pass through without credential injection, and will fail at the upstream provider if the sandbox has no direct API access (which `default: deny` network policy ensures).
 
-**Audit trail.** All inference requests flow through ShellGuard's proxy layer and are logged in the audit log with user context, model requested, and timestamp.
+**Audit trail.** All inference requests flow through Open Terminal Orchestrator's proxy layer and are logged in the audit log with user context, model requested, and timestamp.
 
 **Hot-reload.** The `inference` section is a dynamic policy section. Changes to inference routes take effect immediately on running sandboxes without requiring recreation.
 
 ## Relationship to External LiteLLM Proxy
 
-ShellGuard's `LiteLLMCredentialRouter` is not itself a LiteLLM Proxy instance. It is a lightweight credential-routing layer that sits in front of the per-sandbox LiteLLM instances. In a typical deployment, the architecture may include an external LiteLLM Proxy as the upstream backend:
+Open Terminal Orchestrator's `LiteLLMCredentialRouter` is not itself a LiteLLM Proxy instance. It is a lightweight credential-routing layer that sits in front of the per-sandbox LiteLLM instances. In a typical deployment, the architecture may include an external LiteLLM Proxy as the upstream backend:
 
 ```
-ShellGuard Proxy  →  Sandbox LiteLLM  →  External LiteLLM Proxy  →  OpenAI / Anthropic / etc.
+Open Terminal Orchestrator Proxy  →  Sandbox LiteLLM  →  External LiteLLM Proxy  →  OpenAI / Anthropic / etc.
 (cred routing)       (per-sandbox)        (org-wide, optional)       (upstream providers)
 ```
 
-The external LiteLLM Proxy is optional. If sandboxes are configured to call upstream providers directly, ShellGuard's credential injection provides the API keys. If an external LiteLLM Proxy is used, it adds an additional layer of RBAC, priority queuing, caching, and budget management.
+The external LiteLLM Proxy is optional. If sandboxes are configured to call upstream providers directly, Open Terminal Orchestrator's credential injection provides the API keys. If an external LiteLLM Proxy is used, it adds an additional layer of RBAC, priority queuing, caching, and budget management.

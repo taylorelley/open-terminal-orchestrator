@@ -1,8 +1,8 @@
-# CLAUDE.md — ShellGuard
+# CLAUDE.md — Open Terminal Orchestrator
 
 ## Project Overview
 
-ShellGuard is an admin dashboard for orchestrating secure, per-user terminal sandboxes for Open WebUI. It provides policy-enforced sandbox management, real-time monitoring, audit logging, and user/group administration. The frontend is a React SPA backed by Supabase (PostgreSQL + Auth + Realtime).
+Open Terminal Orchestrator is an admin dashboard for orchestrating secure, per-user terminal sandboxes for Open WebUI. It provides policy-enforced sandbox management, real-time monitoring, audit logging, and user/group administration. The frontend is a React SPA backed by Supabase (PostgreSQL + Auth + Realtime).
 
 See `PRD.md` for full product requirements and architecture details.
 
@@ -99,7 +99,7 @@ All domain types live in `src/types/index.ts`. Key entities:
 |------|-------------|
 | `Policy` | Security policy with YAML definition and versioning |
 | `Sandbox` | Per-user container (states: POOL, WARMING, READY, ACTIVE, SUSPENDED, DESTROYED) |
-| `User` | Open WebUI user synced into ShellGuard |
+| `User` | Open WebUI user synced into Open Terminal Orchestrator |
 | `Group` | User group with optional policy assignment |
 | `PolicyAssignment` | Maps policies to users, groups, or roles with priority |
 | `AuditLogEntry` | Enforcement, lifecycle, and admin events |

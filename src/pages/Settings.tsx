@@ -118,7 +118,7 @@ export default function Settings() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `shellguard-policies-${Date.now()}.json`;
+    a.download = `oto-policies-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -128,7 +128,7 @@ export default function Settings() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `shellguard-config-${Date.now()}.json`;
+    a.download = `oto-config-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -140,7 +140,7 @@ export default function Settings() {
       const blob = await res.blob();
       const disposition = res.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename=(.+)/);
-      const filename = match ? match[1] : `shellguard-backup-${Date.now()}.json`;
+      const filename = match ? match[1] : `oto-backup-${Date.now()}.json`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -177,11 +177,11 @@ export default function Settings() {
           <div className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
             <h3 className="text-sm font-semibold text-zinc-900">Instance Configuration</h3>
             {[
-              { label: 'Instance Name', field: 'instance_name', placeholder: 'ShellGuard Production' },
-              { label: 'Base URL', field: 'base_url', placeholder: 'http://shellguard:8080' },
+              { label: 'Instance Name', field: 'instance_name', placeholder: 'OTO Production' },
+              { label: 'Base URL', field: 'base_url', placeholder: 'http://oto:8080' },
               { label: 'OpenShell Gateway', field: 'openshell_gateway', placeholder: 'http://openshell-gateway:6443' },
               { label: 'Open WebUI Endpoint', field: 'owui_endpoint', placeholder: 'http://open-webui:3000' },
-              { label: 'BYOC Image', field: 'byoc_image', placeholder: 'shellguard-sandbox:slim' },
+              { label: 'BYOC Image', field: 'byoc_image', placeholder: 'oto-sandbox:slim' },
             ].map((item) => (
               <div key={item.field}>
                 <label className="block text-xs font-medium text-zinc-500 mb-1.5">{item.label}</label>
@@ -294,10 +294,10 @@ export default function Settings() {
               <h3 className="text-sm font-semibold text-zinc-900">OIDC Configuration</h3>
               <p className="text-xs text-zinc-400">Configure your Authentik, Keycloak, or other OIDC provider.</p>
               {[
-                { label: 'Issuer URL', field: 'oidc_issuer', placeholder: 'https://auth.example.com/application/o/shellguard/', type: 'text' },
-                { label: 'Client ID', field: 'oidc_client_id', placeholder: 'shellguard-client', type: 'text' },
+                { label: 'Issuer URL', field: 'oidc_issuer', placeholder: 'https://auth.example.com/application/o/oto/', type: 'text' },
+                { label: 'Client ID', field: 'oidc_client_id', placeholder: 'oto-client', type: 'text' },
                 { label: 'Client Secret', field: 'oidc_client_secret', placeholder: 'Enter client secret', type: 'password' },
-                { label: 'Redirect URI', field: 'oidc_redirect_uri', placeholder: 'http://shellguard:8080/admin/api/auth/oidc/callback', type: 'text' },
+                { label: 'Redirect URI', field: 'oidc_redirect_uri', placeholder: 'http://oto:8080/admin/api/auth/oidc/callback', type: 'text' },
               ].map((item) => (
                 <div key={item.field}>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">{item.label}</label>
@@ -437,7 +437,7 @@ export default function Settings() {
                 type="text"
                 value={config.integrations.webhook_url}
                 onChange={(e) => updateConfig('integrations', 'webhook_url', e.target.value)}
-                placeholder="https://hooks.example.com/shellguard"
+                placeholder="https://hooks.example.com/oto"
                 className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 font-mono"
               />
               <p className="text-[11px] text-zinc-400 mt-1">Lifecycle event notifications will be sent to this URL</p>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and register a ShellGuard sandbox image with OpenShell.
+# Build and register an OTO sandbox image with OpenShell.
 #
 # Usage:
 #   ./register.sh [slim|full]
@@ -16,11 +16,11 @@ VARIANT="${1:-slim}"
 case "$VARIANT" in
   slim)
     DOCKERFILE="Dockerfile"
-    TAG="shellguard-sandbox:slim"
+    TAG="oto-sandbox:slim"
     ;;
   full)
     DOCKERFILE="Dockerfile.full"
-    TAG="shellguard-sandbox:full"
+    TAG="oto-sandbox:full"
     ;;
   *)
     echo "Unknown variant: $VARIANT (expected 'slim' or 'full')" >&2

@@ -115,7 +115,7 @@ async def oidc_callback(
         log_admin(db, "oidc_login_failed", details={"error": str(exc)}, source_ip=ip)
         return RedirectResponse("/login?error=oidc_failed", status_code=302)
 
-    # Create a ShellGuard session JWT.
+    # Create an Open Terminal Orchestrator session JWT.
     session_token = oidc_client.create_session_token(user_info)
 
     log_admin(

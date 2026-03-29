@@ -1,8 +1,8 @@
-site_name: ShellGuard Documentation
+site_name: Open Terminal Orchestrator Documentation
 site_description: Secure terminal orchestration for Open WebUI — admin guide, user guide, and developer reference.
-site_url: https://taylorelley.github.io/shellguard/
-repo_url: https://github.com/taylorelley/shellguard
-repo_name: taylorelley/shellguard
+site_url: https://taylorelley.github.io/oto/
+repo_url: https://github.com/taylorelley/oto
+repo_name: taylorelley/oto
 edit_uri: edit/main/docs/
 
 theme:
@@ -83,10 +83,10 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/taylorelley/shellguard
+      link: https://github.com/taylorelley/oto
   generator: false
 
-copyright: Copyright &copy; 2026 ShellGuard Contributors
+copyright: Copyright &copy; 2026 Open Terminal Orchestrator Contributors
 
 nav:
   - Home: README.md

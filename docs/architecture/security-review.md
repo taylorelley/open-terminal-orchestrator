@@ -1,7 +1,7 @@
-# ShellGuard Security Review
+# Open Terminal Orchestrator Security Review
 
 **Date:** 2026-03-28
-**Scope:** Full-stack security assessment of the ShellGuard admin dashboard, covering the FastAPI backend, React SPA frontend, Supabase integration, OpenShell CLI integration, and proxy API.
+**Scope:** Full-stack security assessment of the Open Terminal Orchestrator admin dashboard, covering the FastAPI backend, React SPA frontend, Supabase integration, OpenShell CLI integration, and proxy API.
 
 ---
 
@@ -19,7 +19,7 @@
 
 ### Sandbox Escape Details
 
-The most critical threat for ShellGuard. Mitigations should include:
+The most critical threat for Open Terminal Orchestrator. Mitigations should include:
 
 - Running sandboxes with a non-root user and minimal Linux capabilities (`--cap-drop=ALL`).
 - Using seccomp profiles and AppArmor/SELinux to restrict syscalls.
@@ -70,7 +70,7 @@ YAML policy definitions must be validated strictly:
 
 ## 3. OWASP Top 10 (2021) Assessment
 
-| # | Category | ShellGuard Posture | Risk Level | Notes |
+| # | Category | Open Terminal Orchestrator Posture | Risk Level | Notes |
 |---|---|---|---|---|
 | A01 | **Broken Access Control** | RLS enabled on all tables. Admin auth middleware on API routes. API key validation for management endpoints. | Medium | Verify RLS policies cover all columns and operations (SELECT, INSERT, UPDATE, DELETE). Ensure no endpoints bypass the auth middleware. Test that non-admin JWTs are rejected by every management route. |
 | A02 | **Cryptographic Failures** | Passwords hashed via Supabase Auth (bcrypt). OIDC tokens signed by the IdP. | Low | Enforce TLS on all connections (API, database, Supabase Realtime). Store API keys hashed, not in plaintext. Rotate keys periodically. |

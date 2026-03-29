@@ -1,4 +1,4 @@
-"""Initial ShellGuard schema.
+"""Initial Open Terminal Orchestrator schema.
 
 Revision ID: 0001
 Revises:
@@ -71,7 +71,7 @@ def upgrade() -> None:
         sa.Column("state", sa.Text(), nullable=False, server_default="POOL"),
         sa.Column("policy_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("policies.id", ondelete="SET NULL"), nullable=True),
         sa.Column("internal_ip", sa.Text(), nullable=False, server_default=""),
-        sa.Column("image_tag", sa.Text(), nullable=False, server_default="shellguard-sandbox:slim"),
+        sa.Column("image_tag", sa.Text(), nullable=False, server_default="oto-sandbox:slim"),
         sa.Column("gpu_enabled", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("cpu_usage", sa.Float(), nullable=False, server_default="0"),
         sa.Column("memory_usage", sa.Float(), nullable=False, server_default="0"),

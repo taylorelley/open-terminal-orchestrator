@@ -1,6 +1,6 @@
-# ShellGuard
+# Open Terminal Orchestrator
 
-An open-source orchestration layer that provisions and manages secure, per-user terminal sandboxes for [Open WebUI](https://github.com/open-webui/open-webui). ShellGuard replaces shared container setups with policy-enforced isolation, giving operators granular control over what AI-assisted terminal sessions can access.
+An open-source orchestration layer that provisions and manages secure, per-user terminal sandboxes for [Open WebUI](https://github.com/open-webui/open-webui). Open Terminal Orchestrator replaces shared container setups with policy-enforced isolation, giving operators granular control over what AI-assisted terminal sessions can access.
 
 ## The Problem
 
@@ -9,7 +9,7 @@ Open WebUI's existing terminal modes fall short in multi-user deployments:
 - **Shared container** (`MULTI_USER=true`) provides no isolation between users — one misbehaving process affects everyone.
 - **Enterprise terminals** are closed-source, expensive, and lack granular audit trails or policy enforcement.
 
-ShellGuard bridges this gap by combining **Open Terminal's REST API** (familiar to Open WebUI), **OpenShell's sandbox runtime** (enforced security policies), and a **management orchestrator** (per-user lifecycle, pooling, and auditing).
+Open Terminal Orchestrator bridges this gap by combining **Open Terminal's REST API** (familiar to Open WebUI), **OpenShell's sandbox runtime** (enforced security policies), and a **management orchestrator** (per-user lifecycle, pooling, and auditing).
 
 ## Architecture
 
@@ -21,7 +21,7 @@ ShellGuard bridges this gap by combining **Open Terminal's REST API** (familiar 
                │  X-Open-WebUI-User-Id header
                v
 ┌──────────────────────────────────────────┐
-│       ShellGuard Orchestrator            │
+│       Open Terminal Orchestrator Orchestrator            │
 │            (FastAPI)                     │
 │                                          │
 │  API Proxy ── Policy Engine              │
@@ -44,7 +44,7 @@ ShellGuard bridges this gap by combining **Open Terminal's REST API** (familiar 
 └──────────────────────────────────────────┘
 ```
 
-ShellGuard appears as a **single Open Terminal instance** to Open WebUI. No Open WebUI modifications are needed — just point your terminal integration at `http://shellguard:8080` and ShellGuard transparently routes each user to their own isolated sandbox.
+Open Terminal Orchestrator appears as a **single Open Terminal instance** to Open WebUI. No Open WebUI modifications are needed — just point your terminal integration at `http://oto:8080` and Open Terminal Orchestrator transparently routes each user to their own isolated sandbox.
 
 ## Key Features
 
@@ -161,8 +161,8 @@ Network and inference rules are **dynamic** (hot-reload on running sandboxes). F
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/taylorelley/shellguard.git
-cd shellguard
+git clone https://github.com/taylorelley/open-terminal-orchestrator.git
+cd open-terminal-orchestrator
 cp .env.example .env
 ```
 
@@ -180,8 +180,8 @@ docker compose up -d
 ```
 
 This starts:
-- **shellguard** — The orchestrator (API + admin UI) on port 8080
-- **shellguard-db** — PostgreSQL 16 database
+- **oto** — The orchestrator (API + admin UI) on port 8080
+- **oto-db** — PostgreSQL 16 database
 
 ### 3. Access the admin dashboard
 
@@ -192,10 +192,10 @@ Open `http://localhost:8080` in your browser and log in with your admin credenti
 In Open WebUI's settings, configure the terminal integration URL:
 
 ```
-http://shellguard:8080
+http://oto:8080
 ```
 
-Open WebUI will inject the `X-Open-WebUI-User-Id` header automatically. ShellGuard handles the rest.
+Open WebUI will inject the `X-Open-WebUI-User-Id` header automatically. Open Terminal Orchestrator handles the rest.
 
 ## Development Setup
 
@@ -279,7 +279,7 @@ backend/
 supabase/
 └── migrations/                  # PostgreSQL schema migrations
 
-shellguard-sandbox/
+oto-sandbox/
 ├── Dockerfile                   # Slim sandbox image
 └── Dockerfile.full              # Full sandbox image
 ```
@@ -294,7 +294,7 @@ shellguard-sandbox/
 | `POOL_WARMUP_SIZE` | `2` | Pre-warmed sandboxes to maintain |
 | `POOL_MAX_SANDBOXES` | `20` | Maximum total sandboxes |
 | `POOL_MAX_ACTIVE` | `10` | Maximum concurrently active sandboxes |
-| `DEFAULT_IMAGE_TAG` | `shellguard-sandbox:slim` | Sandbox container image |
+| `DEFAULT_IMAGE_TAG` | `oto-sandbox:slim` | Sandbox container image |
 | `IDLE_TIMEOUT` | `1800` | Seconds before suspending idle sandboxes |
 | `SUSPEND_TIMEOUT` | `86400` | Seconds before destroying suspended sandboxes |
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warning, error) |
@@ -314,11 +314,11 @@ Full documentation is available in the [docs/](docs/README.md) directory:
 - **[Policy Guide](docs/user-guide/managing-policies.md)** — Writing and assigning security policies
 - **[Runbook](docs/operations/runbook.md)** | **[Troubleshooting](docs/operations/troubleshooting.md)** — Operations
 - **[Security Review](docs/architecture/security-review.md)** — Threat model and compliance
-- **[Developer Guide](docs/developer-guide/setup.md)** — Contributing and extending ShellGuard
+- **[Developer Guide](docs/developer-guide/setup.md)** — Contributing and extending Open Terminal Orchestrator
 
 ## Security
 
-ShellGuard enforces isolation at multiple levels: container namespaces, L7 network policies, filesystem whitelists, process restrictions, and credential management. Row-Level Security is enabled on all database tables.
+Open Terminal Orchestrator enforces isolation at multiple levels: container namespaces, L7 network policies, filesystem whitelists, process restrictions, and credential management. Row-Level Security is enabled on all database tables.
 
 For security best practices and vulnerability reporting, see [SECURITY.md](SECURITY.md).
 
