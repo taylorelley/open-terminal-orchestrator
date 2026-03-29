@@ -156,7 +156,7 @@ cd backend && python -m pytest -v
    git checkout -b feature/add-gpu-policy-support
    ```
 
-2. **Make your changes** following the code conventions above.
+2. **Make your changes** following the code conventions above. When your changes affect user-facing behavior, configuration options, API endpoints, or architecture, update the relevant documentation in `docs/` as part of the same PR. See the [Documentation Hub](docs/README.md) for the doc structure.
 
 3. **Run all checks** before committing:
    ```bash

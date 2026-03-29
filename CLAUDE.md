@@ -128,3 +128,59 @@ VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 - No test framework is configured yet — testing infrastructure is a future addition
 - No Prettier — rely on ESLint for code quality
 - Vite build splits chunks: `vendor` (React), `charts` (Recharts), `supabase` (Supabase JS)
+
+## Documentation Maintenance
+
+**Rule:** When making changes that affect any of the following, update the corresponding documentation in the same commit or PR:
+
+| Change Type | Update These Docs |
+|---|---|
+| New or changed API endpoints | `docs/architecture/api-reference.md` |
+| New or changed configuration / env vars | `docs/admin-guide/configuration-reference.md` AND `.env.example` |
+| New frontend pages or features | `docs/user-guide/` (relevant file) AND `docs/developer-guide/frontend-guide.md` |
+| New backend routes or services | `docs/developer-guide/backend-guide.md` |
+| Policy engine changes | `docs/user-guide/managing-policies.md` |
+| Deployment or infrastructure changes | `docs/admin-guide/deployment.md` |
+| Database schema changes | `docs/developer-guide/database-migrations.md` |
+| Security-relevant changes | `docs/architecture/security-review.md` |
+| Authentication changes | `docs/admin-guide/authentication.md` |
+| Monitoring or alerting changes | `docs/admin-guide/monitoring-alerting.md` |
+| Sandbox lifecycle changes | `docs/user-guide/managing-sandboxes.md` |
+
+If you add a new documentation file, add a link to it in `docs/README.md`.
+
+### Documentation Structure
+
+```
+docs/
+├── README.md                    # Documentation hub — start here
+├── user-guide/                  # For operators using the dashboard
+│   ├── getting-started.md
+│   ├── dashboard-overview.md
+│   ├── managing-sandboxes.md
+│   ├── managing-policies.md
+│   └── managing-users-groups.md
+├── admin-guide/                 # For sysadmins deploying and configuring
+│   ├── deployment.md
+│   ├── configuration-reference.md
+│   ├── authentication.md
+│   ├── tls-reverse-proxy.md
+│   ├── inference-routing.md
+│   ├── monitoring-alerting.md
+│   └── backup-restore.md
+├── operations/                  # Day-to-day operational procedures
+│   ├── runbook.md
+│   └── troubleshooting.md
+├── architecture/                # System design and reference
+│   ├── overview.md
+│   ├── api-reference.md
+│   └── security-review.md
+├── developer-guide/             # For contributors extending the codebase
+│   ├── setup.md
+│   ├── frontend-guide.md
+│   ├── backend-guide.md
+│   ├── testing.md
+│   └── database-migrations.md
+└── releases/
+    └── changelog.md
+```
