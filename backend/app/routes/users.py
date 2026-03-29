@@ -34,7 +34,7 @@ async def sync_users(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Sync users from Open WebUI into ShellGuard."""
+    """Sync users from Open WebUI into Open Terminal Orchestrator."""
     result = await sync_users_from_owui(db)
     log_admin(
         db,

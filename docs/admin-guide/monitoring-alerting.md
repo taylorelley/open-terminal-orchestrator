@@ -1,6 +1,6 @@
 # Monitoring and Alerting
 
-ShellGuard exposes Prometheus metrics, supports OpenTelemetry distributed tracing, and provides a built-in alerting system with webhook notifications. This guide covers setup and configuration for production observability.
+Open Terminal Orchestrator exposes Prometheus metrics, supports OpenTelemetry distributed tracing, and provides a built-in alerting system with webhook notifications. This guide covers setup and configuration for production observability.
 
 ---
 
@@ -8,7 +8,7 @@ ShellGuard exposes Prometheus metrics, supports OpenTelemetry distributed tracin
 
 ### Endpoint
 
-ShellGuard exposes metrics in Prometheus exposition format at:
+Open Terminal Orchestrator exposes metrics in Prometheus exposition format at:
 
 ```
 GET /metrics
@@ -27,11 +27,11 @@ When set, Prometheus must include the token in its scrape configuration:
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: shellguard
+  - job_name: oto
     scheme: https
     bearer_token: prom-secret-token
     static_configs:
-      - targets: ["shellguard.example.com:443"]
+      - targets: ["oto.example.com:443"]
     metrics_path: /metrics
     scrape_interval: 15s
 ```
@@ -44,59 +44,59 @@ When `METRICS_TOKEN` is empty, the endpoint is unauthenticated.
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `shellguard_sandboxes_total` | gauge | `state` | Total number of sandboxes by state (`pool`, `warming`, `ready`, `active`, `suspended`, `destroyed`) |
-| `shellguard_sandboxes_created_total` | counter | `image` | Cumulative number of sandboxes created, labeled by container image |
-| `shellguard_sandboxes_destroyed_total` | counter | `reason` | Cumulative number of sandboxes destroyed, labeled by reason (`idle_timeout`, `suspend_timeout`, `admin`, `error`, `policy`) |
-| `shellguard_sandbox_startup_duration_seconds` | histogram | `image` | Time from container creation to READY state |
-| `shellguard_sandbox_resume_duration_seconds` | histogram | -- | Time from SUSPENDED to ACTIVE state |
-| `shellguard_sandbox_session_duration_seconds` | histogram | -- | Duration of user sessions (ACTIVE state) |
+| `oto_sandboxes_total` | gauge | `state` | Total number of sandboxes by state (`pool`, `warming`, `ready`, `active`, `suspended`, `destroyed`) |
+| `oto_sandboxes_created_total` | counter | `image` | Cumulative number of sandboxes created, labeled by container image |
+| `oto_sandboxes_destroyed_total` | counter | `reason` | Cumulative number of sandboxes destroyed, labeled by reason (`idle_timeout`, `suspend_timeout`, `admin`, `error`, `policy`) |
+| `oto_sandbox_startup_duration_seconds` | histogram | `image` | Time from container creation to READY state |
+| `oto_sandbox_resume_duration_seconds` | histogram | -- | Time from SUSPENDED to ACTIVE state |
+| `oto_sandbox_session_duration_seconds` | histogram | -- | Duration of user sessions (ACTIVE state) |
 
 #### Pool Metrics
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `shellguard_pool_ready_count` | gauge | -- | Number of sandboxes currently in READY state in the warm pool |
-| `shellguard_pool_target_size` | gauge | -- | Configured `POOL_WARMUP_SIZE` target |
-| `shellguard_pool_max_sandboxes` | gauge | -- | Configured `POOL_MAX_SANDBOXES` limit |
-| `shellguard_pool_max_active` | gauge | -- | Configured `POOL_MAX_ACTIVE` limit |
-| `shellguard_pool_utilization_ratio` | gauge | -- | Ratio of active sandboxes to `POOL_MAX_ACTIVE` (0.0 -- 1.0) |
-| `shellguard_pool_queue_length` | gauge | -- | Number of sandbox requests waiting in the queue |
+| `oto_pool_ready_count` | gauge | -- | Number of sandboxes currently in READY state in the warm pool |
+| `oto_pool_target_size` | gauge | -- | Configured `POOL_WARMUP_SIZE` target |
+| `oto_pool_max_sandboxes` | gauge | -- | Configured `POOL_MAX_SANDBOXES` limit |
+| `oto_pool_max_active` | gauge | -- | Configured `POOL_MAX_ACTIVE` limit |
+| `oto_pool_utilization_ratio` | gauge | -- | Ratio of active sandboxes to `POOL_MAX_ACTIVE` (0.0 -- 1.0) |
+| `oto_pool_queue_length` | gauge | -- | Number of sandbox requests waiting in the queue |
 
 #### HTTP Request Metrics
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `shellguard_http_requests_total` | counter | `method`, `path`, `status` | Total HTTP requests handled |
-| `shellguard_http_request_duration_seconds` | histogram | `method`, `path` | Request latency in seconds |
-| `shellguard_proxy_requests_total` | counter | `status` | Total requests proxied to sandbox containers |
-| `shellguard_proxy_request_duration_seconds` | histogram | -- | Proxy request latency in seconds |
+| `oto_http_requests_total` | counter | `method`, `path`, `status` | Total HTTP requests handled |
+| `oto_http_request_duration_seconds` | histogram | `method`, `path` | Request latency in seconds |
+| `oto_proxy_requests_total` | counter | `status` | Total requests proxied to sandbox containers |
+| `oto_proxy_request_duration_seconds` | histogram | -- | Proxy request latency in seconds |
 
 #### Policy Enforcement Metrics
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `shellguard_policy_enforcements_total` | counter | `policy`, `action`, `result` | Total policy enforcement events. `action` is the enforced action (e.g., `block_command`, `restrict_network`). `result` is `allowed` or `denied`. |
-| `shellguard_policy_evaluation_duration_seconds` | histogram | -- | Time spent evaluating policy rules |
+| `oto_policy_enforcements_total` | counter | `policy`, `action`, `result` | Total policy enforcement events. `action` is the enforced action (e.g., `block_command`, `restrict_network`). `result` is `allowed` or `denied`. |
+| `oto_policy_evaluation_duration_seconds` | histogram | -- | Time spent evaluating policy rules |
 
 #### Audit Metrics
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `shellguard_audit_events_total` | counter | `event_type` | Total audit log events by type |
-| `shellguard_audit_log_size` | gauge | -- | Current number of rows in the audit log table |
+| `oto_audit_events_total` | counter | `event_type` | Total audit log events by type |
+| `oto_audit_log_size` | gauge | -- | Current number of rows in the audit log table |
 
 ---
 
 ## Grafana Dashboard
 
-ShellGuard ships with a pre-built Grafana dashboard.
+Open Terminal Orchestrator ships with a pre-built Grafana dashboard.
 
 ### Importing the Dashboard
 
 1. Locate the dashboard JSON file in the repository:
 
    ```
-   deploy/grafana/shellguard-dashboard.json
+   deploy/grafana/oto-dashboard.json
    ```
 
 2. In Grafana, go to **Dashboards > Import** and upload the JSON file or paste its contents.
@@ -126,7 +126,7 @@ The dashboard uses Grafana template variables for the Prometheus data source and
 
 ## OpenTelemetry Tracing
 
-ShellGuard supports distributed tracing via OpenTelemetry for debugging request flows across the system.
+Open Terminal Orchestrator supports distributed tracing via OpenTelemetry for debugging request flows across the system.
 
 ### Configuration
 
@@ -135,14 +135,14 @@ Enable tracing with the following environment variables:
 ```bash
 OTEL_ENABLED=true
 OTEL_ENDPOINT=http://otel-collector:4317
-OTEL_SERVICE_NAME=shellguard
+OTEL_SERVICE_NAME=oto
 ```
 
 | Variable | Description |
 |----------|-------------|
 | `OTEL_ENABLED` | Set to `true` to enable trace export. Default: `false`. |
 | `OTEL_ENDPOINT` | OTLP gRPC endpoint. This is typically an OpenTelemetry Collector, Jaeger (with OTLP receiver), or Grafana Tempo. |
-| `OTEL_SERVICE_NAME` | Service name attached to all spans. Default: `shellguard`. |
+| `OTEL_SERVICE_NAME` | Service name attached to all spans. Default: `oto`. |
 
 ### Instrumented Operations
 
@@ -184,11 +184,11 @@ tempo:
 
 ## Alert Rules
 
-ShellGuard's dashboard (the **Monitoring** page in the admin UI) includes a built-in alert configuration system.
+Open Terminal Orchestrator's dashboard (the **Monitoring** page in the admin UI) includes a built-in alert configuration system.
 
 ### Configuring Alerts
 
-Navigate to **Monitoring > Alerts** in the ShellGuard dashboard. Each alert rule has the following settings:
+Navigate to **Monitoring > Alerts** in the Open Terminal Orchestrator dashboard. Each alert rule has the following settings:
 
 | Setting | Description |
 |---------|-------------|
@@ -228,7 +228,7 @@ Alerts can trigger HTTP webhook notifications to integrate with external systems
 
 ### Configuring Webhooks
 
-Navigate to **Monitoring > Alerts > Notification Channels** in the ShellGuard dashboard.
+Navigate to **Monitoring > Alerts > Notification Channels** in the Open Terminal Orchestrator dashboard.
 
 | Setting | Description |
 |---------|-------------|
@@ -281,11 +281,11 @@ Template:
 {
   "routing_key": "your-pagerduty-integration-key",
   "event_action": "{{#if resolved}}resolve{{else}}trigger{{/if}}",
-  "dedup_key": "shellguard-{{alert_name}}",
+  "dedup_key": "oto-{{alert_name}}",
   "payload": {
     "summary": "{{message}}",
     "severity": "{{severity}}",
-    "source": "shellguard"
+    "source": "oto"
   }
 }
 ```
@@ -294,11 +294,11 @@ Template:
 
 ## Syslog Forwarding
 
-ShellGuard can forward audit log events to an external syslog receiver for integration with SIEM systems (Splunk, Elastic SIEM, QRadar, etc.).
+Open Terminal Orchestrator can forward audit log events to an external syslog receiver for integration with SIEM systems (Splunk, Elastic SIEM, QRadar, etc.).
 
 ### Configuration
 
-Configure syslog forwarding in the ShellGuard dashboard under **Settings > Integrations > Syslog**.
+Configure syslog forwarding in the Open Terminal Orchestrator dashboard under **Settings > Integrations > Syslog**.
 
 | Setting | Description |
 |---------|-------------|
@@ -314,7 +314,7 @@ Configure syslog forwarding in the ShellGuard dashboard under **Settings > Integ
 ### Syslog Message Format (RFC 5424)
 
 ```
-<134>1 2026-03-29T14:30:00.000Z shellguard shellguard - audit [meta policy="default-policy" action="block_command" user="john@example.com" sandbox="sb_abc123"] Policy enforcement: command blocked by default-policy
+<134>1 2026-03-29T14:30:00.000Z oto oto - audit [meta policy="default-policy" action="block_command" user="john@example.com" sandbox="sb_abc123"] Policy enforcement: command blocked by default-policy
 ```
 
 ### Forwarded Event Types
@@ -334,11 +334,11 @@ The following audit event types can be forwarded:
 
 ### Integration with Common SIEM Platforms
 
-**Splunk:** Configure a TCP/TLS syslog input on your Splunk Heavy Forwarder or Universal Forwarder. Set the source type to `syslog` and create an index for ShellGuard events.
+**Splunk:** Configure a TCP/TLS syslog input on your Splunk Heavy Forwarder or Universal Forwarder. Set the source type to `syslog` and create an index for Open Terminal Orchestrator events.
 
 **Elastic SIEM:** Use a Filebeat syslog input module or Logstash syslog input plugin to ingest events into Elasticsearch. Create an index pattern and detection rules for policy enforcement events.
 
-**QRadar:** Add a syslog log source in QRadar pointing to the ShellGuard server. Map event types to QRadar categories using a custom DSM or the Universal DSM.
+**QRadar:** Add a syslog log source in QRadar pointing to the Open Terminal Orchestrator server. Map event types to QRadar categories using a custom DSM or the Universal DSM.
 
 ---
 
@@ -351,19 +351,19 @@ Verify that the `METRICS_TOKEN` value in your `.env` file matches the `bearer_to
 ### No traces appearing
 
 1. Confirm `OTEL_ENABLED=true` is set and the backend was restarted after the change.
-2. Verify the `OTEL_ENDPOINT` is reachable from the ShellGuard container: `curl -v http://otel-collector:4317`.
-3. Check ShellGuard logs for OTLP export errors (set `LOG_LEVEL=debug` temporarily).
+2. Verify the `OTEL_ENDPOINT` is reachable from the Open Terminal Orchestrator container: `curl -v http://otel-collector:4317`.
+3. Check Open Terminal Orchestrator logs for OTLP export errors (set `LOG_LEVEL=debug` temporarily).
 
 ### Alerts not firing
 
 1. Verify the alert rule is enabled and the evaluation interval has elapsed.
 2. Check the "for duration" -- the condition must persist for this period.
 3. Verify the notification channel URL is correct and the target service is reachable.
-4. Check the ShellGuard logs for webhook delivery errors.
+4. Check the Open Terminal Orchestrator logs for webhook delivery errors.
 
 ### Syslog messages not arriving
 
-1. Verify network connectivity between ShellGuard and the syslog receiver (check firewalls and security groups).
+1. Verify network connectivity between Open Terminal Orchestrator and the syslog receiver (check firewalls and security groups).
 2. If using TLS, confirm the CA certificate is correct and the syslog server's certificate is valid.
 3. Try switching to UDP/TCP temporarily to rule out TLS issues.
-4. Check ShellGuard logs for syslog connection errors.
+4. Check Open Terminal Orchestrator logs for syslog connection errors.

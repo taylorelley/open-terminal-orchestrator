@@ -1,10 +1,10 @@
 # Database Migrations Guide
 
-This guide covers how to create, apply, and manage database migrations for ShellGuard.
+This guide covers how to create, apply, and manage database migrations for Open Terminal Orchestrator.
 
 ## Overview
 
-ShellGuard uses PostgreSQL 16 via Supabase. Database schema changes are managed through SQL migration files in the `supabase/migrations/` directory. All tables use Row-Level Security (RLS) for access control.
+Open Terminal Orchestrator uses PostgreSQL 16 via Supabase. Database schema changes are managed through SQL migration files in the `supabase/migrations/` directory. All tables use Row-Level Security (RLS) for access control.
 
 ## Migration Workflow
 
@@ -43,7 +43,7 @@ Migration files follow this naming pattern:
 Examples:
 
 ```
-20260326203442_create_shellguard_schema.sql
+20260326203442_create_oto_schema.sql
 20260327145200_add_sandbox_metrics_table.sql
 20260328091500_add_index_on_audit_log_created_at.sql
 20260329110000_add_reports_table.sql
@@ -109,11 +109,11 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log (created_at DES
 
 ## Row-Level Security
 
-All tables in ShellGuard must have RLS enabled. This is a security requirement enforced at the database level.
+All tables in Open Terminal Orchestrator must have RLS enabled. This is a security requirement enforced at the database level.
 
 ### RLS Pattern for Admin-Only Access
 
-Most ShellGuard tables use admin-only access since the dashboard is an admin tool:
+Most Open Terminal Orchestrator tables use admin-only access since the dashboard is an admin tool:
 
 ```sql
 -- Enable RLS on the table
@@ -184,7 +184,7 @@ done
 If using the Docker Compose setup, migrations can be applied against the local database:
 
 ```bash
-psql "postgresql://postgres:postgres@localhost:5432/shellguard" \
+psql "postgresql://postgres:postgres@localhost:5432/oto" \
     -f supabase/migrations/<migration_file>.sql
 ```
 
@@ -275,14 +275,14 @@ npm run lint && npm run typecheck
 
 ## Existing Tables
 
-The current ShellGuard schema includes these tables:
+The current Open Terminal Orchestrator schema includes these tables:
 
 | Table | Description |
 |-------|-------------|
 | `policies` | Security policy definitions |
 | `policy_versions` | Versioned snapshots of policy YAML |
 | `groups` | User groups with optional policy assignment |
-| `users` | Open WebUI users synced into ShellGuard |
+| `users` | Open WebUI users synced into Open Terminal Orchestrator |
 | `sandboxes` | Per-user terminal sandbox instances |
 | `policy_assignments` | Maps policies to users, groups, or roles with priority |
 | `audit_log` | Enforcement, lifecycle, and admin event records |

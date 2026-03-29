@@ -1,12 +1,12 @@
 # Backup and Restore
 
-This guide covers backup strategies, restore procedures, and disaster recovery planning for ShellGuard deployments.
+This guide covers backup strategies, restore procedures, and disaster recovery planning for Open Terminal Orchestrator deployments.
 
 ---
 
 ## What Data Needs Backing Up
 
-ShellGuard stores data in two locations:
+Open Terminal Orchestrator stores data in two locations:
 
 ### 1. PostgreSQL Database
 
@@ -39,20 +39,20 @@ Each user's sandbox has a persistent data volume mounted at `/data/<user>` on th
 Create a full database dump:
 
 ```bash
-pg_dump -h shellguard-db -U shellguard -d shellguard \
+pg_dump -h oto-db -U oto -d oto \
   --format=custom \
   --compress=9 \
-  --file=shellguard_$(date +%Y%m%d_%H%M%S).dump
+  --file=oto_$(date +%Y%m%d_%H%M%S).dump
 ```
 
 For Docker Compose deployments, run the dump inside the database container:
 
 ```bash
-docker compose exec shellguard-db \
-  pg_dump -U shellguard -d shellguard \
+docker compose exec oto-db \
+  pg_dump -U oto -d oto \
     --format=custom \
     --compress=9 \
-  > shellguard_$(date +%Y%m%d_%H%M%S).dump
+  > oto_$(date +%Y%m%d_%H%M%S).dump
 ```
 
 **Flags explained:**
@@ -64,22 +64,22 @@ docker compose exec shellguard-db \
 
 ### Automated Backups with Cron
 
-Create a backup script at `/opt/shellguard/backup.sh`:
+Create a backup script at `/opt/oto/backup.sh`:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
-BACKUP_DIR="/var/backups/shellguard"
+BACKUP_DIR="/var/backups/oto"
 RETENTION_DAYS=30
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/shellguard_${TIMESTAMP}.dump"
+BACKUP_FILE="${BACKUP_DIR}/oto_${TIMESTAMP}.dump"
 
 mkdir -p "${BACKUP_DIR}"
 
 # Database backup
-docker compose -f /opt/shellguard/docker-compose.yml exec -T shellguard-db \
-  pg_dump -U shellguard -d shellguard \
+docker compose -f /opt/oto/docker-compose.yml exec -T oto-db \
+  pg_dump -U oto -d oto \
     --format=custom \
     --compress=9 \
   > "${BACKUP_FILE}"
@@ -92,7 +92,7 @@ if [ ! -s "${BACKUP_FILE}" ]; then
 fi
 
 # Delete backups older than retention period
-find "${BACKUP_DIR}" -name "shellguard_*.dump" -mtime +${RETENTION_DAYS} -delete
+find "${BACKUP_DIR}" -name "oto_*.dump" -mtime +${RETENTION_DAYS} -delete
 
 echo "Backup completed: ${BACKUP_FILE} ($(du -h "${BACKUP_FILE}" | cut -f1))"
 ```
@@ -100,8 +100,8 @@ echo "Backup completed: ${BACKUP_FILE} ($(du -h "${BACKUP_FILE}" | cut -f1))"
 Add a cron entry to run daily at 2:00 AM:
 
 ```bash
-# /etc/cron.d/shellguard-backup
-0 2 * * * root /opt/shellguard/backup.sh >> /var/log/shellguard-backup.log 2>&1
+# /etc/cron.d/oto-backup
+0 2 * * * root /opt/oto/backup.sh >> /var/log/oto-backup.log 2>&1
 ```
 
 ### Offsite Backup
@@ -110,10 +110,10 @@ Copy backups to an offsite location (S3, GCS, or a remote server):
 
 ```bash
 # S3 example
-aws s3 cp "${BACKUP_FILE}" s3://your-bucket/shellguard-backups/
+aws s3 cp "${BACKUP_FILE}" s3://your-bucket/oto-backups/
 
 # rsync to remote server
-rsync -az "${BACKUP_DIR}/" backup-server:/backups/shellguard/
+rsync -az "${BACKUP_DIR}/" backup-server:/backups/oto/
 ```
 
 ---
@@ -129,7 +129,7 @@ Add the following to your PostgreSQL configuration (`postgresql.conf`):
 ```ini
 wal_level = replica
 archive_mode = on
-archive_command = 'cp %p /var/backups/shellguard/wal/%f'
+archive_command = 'cp %p /var/backups/oto/wal/%f'
 ```
 
 For Docker Compose, pass these as command-line arguments or mount a custom `postgresql.conf`.
@@ -139,12 +139,12 @@ For Docker Compose, pass these as command-line arguments or mount a custom `post
 Take a base backup that WAL archives build upon:
 
 ```bash
-pg_basebackup -h shellguard-db -U shellguard \
-  -D /var/backups/shellguard/base \
+pg_basebackup -h oto-db -U oto \
+  -D /var/backups/oto/base \
   --format=tar \
   --gzip \
   --checkpoint=fast \
-  --label="shellguard-base-$(date +%Y%m%d)"
+  --label="oto-base-$(date +%Y%m%d)"
 ```
 
 ### Recovery
@@ -155,7 +155,7 @@ To restore from a base backup and WAL archives:
 2. Replace the data directory with the base backup.
 3. Create a `recovery.signal` file and configure `restore_command` in `postgresql.conf`:
    ```ini
-   restore_command = 'cp /var/backups/shellguard/wal/%f %p'
+   restore_command = 'cp /var/backups/oto/wal/%f %p'
    recovery_target_time = '2026-03-29 12:00:00 UTC'  # optional: point-in-time
    ```
 4. Start the database server. PostgreSQL will replay WAL files to reach the target state.
@@ -166,31 +166,31 @@ To restore from a base backup and WAL archives:
 
 ### Full Restore from pg_dump
 
-1. **Stop the ShellGuard backend** to prevent writes during restore:
+1. **Stop the Open Terminal Orchestrator backend** to prevent writes during restore:
 
    ```bash
-   docker compose stop shellguard-backend
+   docker compose stop oto-backend
    ```
 
 2. **Drop and recreate the database** (or restore to a new database):
 
    ```bash
-   docker compose exec shellguard-db \
-     psql -U shellguard -c "DROP DATABASE IF EXISTS shellguard;"
-   docker compose exec shellguard-db \
-     psql -U shellguard -c "CREATE DATABASE shellguard OWNER shellguard;"
+   docker compose exec oto-db \
+     psql -U oto -c "DROP DATABASE IF EXISTS oto;"
+   docker compose exec oto-db \
+     psql -U oto -c "CREATE DATABASE oto OWNER oto;"
    ```
 
 3. **Restore the dump:**
 
    ```bash
-   docker compose exec -T shellguard-db \
-     pg_restore -U shellguard -d shellguard \
+   docker compose exec -T oto-db \
+     pg_restore -U oto -d oto \
        --no-owner \
        --no-privileges \
        --clean \
        --if-exists \
-     < shellguard_20260329_020000.dump
+     < oto_20260329_020000.dump
    ```
 
    | Flag | Purpose |
@@ -205,7 +205,7 @@ To restore from a base backup and WAL archives:
 5. **Restart the backend:**
 
    ```bash
-   docker compose start shellguard-backend
+   docker compose start oto-backend
    ```
 
 ### Selective Restore
@@ -213,11 +213,11 @@ To restore from a base backup and WAL archives:
 To restore only specific tables (e.g., only policies):
 
 ```bash
-pg_restore -U shellguard -d shellguard \
+pg_restore -U oto -d oto \
   --table=policies \
   --table=policy_versions \
   --data-only \
-  shellguard_20260329_020000.dump
+  oto_20260329_020000.dump
 ```
 
 ### Verifying Data Integrity
@@ -267,14 +267,14 @@ If your deployment uses persistent sandbox data, back up the volume directory:
 tar czf sandbox_data_$(date +%Y%m%d).tar.gz /data/
 
 # Incremental with rsync
-rsync -az --delete /data/ /var/backups/shellguard/sandbox-data/
+rsync -az --delete /data/ /var/backups/oto/sandbox-data/
 ```
 
 ### Restore
 
 ```bash
 # Stop all sandboxes first
-docker compose exec shellguard-backend \
+docker compose exec oto-backend \
   curl -X POST http://localhost:8000/api/v1/admin/sandboxes/destroy-all
 
 # Restore data
@@ -343,7 +343,7 @@ Use this checklist to prepare for and recover from a disaster scenario.
 
 3. **Start the database container:**
    ```bash
-   docker compose up -d shellguard-db
+   docker compose up -d oto-db
    ```
 
 4. **Restore the database** from the latest backup following the [Restore Procedure](#restore-procedure) above.

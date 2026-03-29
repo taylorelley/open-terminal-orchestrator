@@ -1,6 +1,6 @@
-# ShellGuard Deployment Guide
+# Open Terminal Orchestrator Deployment Guide
 
-This document covers deploying ShellGuard using Docker Compose for quick-start/development and K3s for production environments.
+This document covers deploying Open Terminal Orchestrator using Docker Compose for quick-start/development and K3s for production environments.
 
 ## Prerequisites
 
@@ -11,13 +11,13 @@ This document covers deploying ShellGuard using Docker Compose for quick-start/d
 
 ## Docker Compose Quick Start
 
-The provided `docker-compose.yml` starts ShellGuard and its PostgreSQL database.
+The provided `docker-compose.yml` starts Open Terminal Orchestrator and its PostgreSQL database.
 
 ### 1. Clone and Configure
 
 ```bash
-git clone <repository-url> shellguard
-cd shellguard
+git clone <repository-url> oto
+cd open-terminal-orchestrator
 cp .env.example .env   # or create .env manually
 ```
 
@@ -31,11 +31,11 @@ OPEN_WEBUI_API_KEY=your-open-webui-api-key
 ADMIN_API_KEY=your-admin-api-key
 
 # Optional overrides
-SG_DB_PASS=shellguard
+SG_DB_PASS=oto
 POOL_WARMUP_SIZE=2
 POOL_MAX_SANDBOXES=20
 POOL_MAX_ACTIVE=10
-DEFAULT_IMAGE_TAG=shellguard-sandbox:slim
+DEFAULT_IMAGE_TAG=oto-sandbox:slim
 IDLE_TIMEOUT=1800
 SUSPEND_TIMEOUT=86400
 LOG_LEVEL=info
@@ -53,10 +53,10 @@ docker compose up -d
 
 This starts two containers:
 
-- **shellguard** -- The backend API + admin UI on port 8080
-- **shellguard-db** -- PostgreSQL 16 Alpine with a health check
+- **oto** -- The backend API + admin UI on port 8080
+- **oto-db** -- PostgreSQL 16 Alpine with a health check
 
-The ShellGuard container depends on the database being healthy before starting.
+The Open Terminal Orchestrator container depends on the database being healthy before starting.
 
 ### 3. Verify
 
@@ -75,7 +75,7 @@ You should see `{"status": "healthy", "version": "0.1.0", "checks": {"database":
 In Open WebUI admin settings, go to Integrations and set the terminal endpoint to:
 
 ```
-http://shellguard:8080
+http://oto:8080
 ```
 
 (Use the Docker network hostname if Open WebUI is on the same Docker network, or `http://host:8080` if accessing externally.)
@@ -85,15 +85,15 @@ http://shellguard:8080
 ```
 docker compose up
   |
-  +-- shellguard-db (postgres:16-alpine)
+  +-- oto-db (postgres:16-alpine)
   |     Port: internal only
-  |     Volume: shellguard-db-data
+  |     Volume: oto-db-data
   |
-  +-- shellguard (FastAPI + React SPA)
+  +-- oto (FastAPI + React SPA)
         Port: 8080:8080
-        Volume: shellguard-user-data -> /var/lib/shellguard/user-data
+        Volume: oto-user-data -> /var/lib/oto/user-data
         Volume: /var/run/docker.sock (for container management)
-        Depends on: shellguard-db (healthy)
+        Depends on: oto-db (healthy)
 ```
 
 ## K3s Production Deployment
@@ -104,13 +104,13 @@ The `deploy/k3s/` directory contains Kubernetes manifests managed with Kustomize
 
 | File | Purpose |
 |---|---|
-| `namespace.yaml` | Creates the `shellguard` namespace |
+| `namespace.yaml` | Creates the `oto` namespace |
 | `secret.yaml` | Stores database password, API keys, OIDC secrets |
 | `configmap.yaml` | Non-sensitive configuration (pool sizes, timeouts, URLs) |
 | `postgres.yaml` | PostgreSQL StatefulSet with PVC |
 | `pvc.yaml` | PersistentVolumeClaim for user data volumes |
-| `shellguard.yaml` | ShellGuard Deployment |
-| `service.yaml` | ClusterIP Service for ShellGuard |
+| `oto.yaml` | Open Terminal Orchestrator Deployment |
+| `service.yaml` | ClusterIP Service for Open Terminal Orchestrator |
 | `ingress.yaml` | Ingress resource for external access |
 | `kustomization.yaml` | Kustomize configuration tying it all together |
 
@@ -119,10 +119,10 @@ The `deploy/k3s/` directory contains Kubernetes manifests managed with Kustomize
 Edit `deploy/k3s/secret.yaml` or use `kubectl create secret`:
 
 ```bash
-kubectl create namespace shellguard
+kubectl create namespace oto
 
-kubectl -n shellguard create secret generic shellguard-secrets \
-  --from-literal=database-url='postgresql://shellguard:YOUR_DB_PASS@shellguard-db:5432/shellguard' \
+kubectl -n oto create secret generic oto-secrets \
+  --from-literal=database-url='postgresql://oto:YOUR_DB_PASS@oto-db:5432/oto' \
   --from-literal=admin-api-key='YOUR_ADMIN_KEY' \
   --from-literal=open-webui-api-key='YOUR_OWUI_KEY' \
   --from-literal=oidc-client-secret='YOUR_OIDC_SECRET'
@@ -152,14 +152,14 @@ kubectl apply -k deploy/k3s/
 ### 4. Verify
 
 ```bash
-kubectl -n shellguard get pods
-kubectl -n shellguard logs deployment/shellguard
-curl https://shellguard.your-domain.com/health
+kubectl -n oto get pods
+kubectl -n oto logs deployment/oto
+curl https://oto.your-domain.com/health
 ```
 
 ### Ingress
 
-Edit `deploy/k3s/ingress.yaml` to match your domain and TLS configuration. The default expects a TLS secret named `shellguard-tls` and routes to the ShellGuard service on port 8080.
+Edit `deploy/k3s/ingress.yaml` to match your domain and TLS configuration. The default expects a TLS secret named `oto-tls` and routes to the Open Terminal Orchestrator service on port 8080.
 
 ## Environment Variable Reference
 
@@ -169,7 +169,7 @@ All configuration is read from environment variables by the backend `Settings` c
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | `postgresql+asyncpg://shellguard:shellguard@localhost:5432/shellguard` | PostgreSQL connection string. The `postgresql://` prefix is auto-converted to `postgresql+asyncpg://`. |
+| `DATABASE_URL` | `postgresql+asyncpg://oto:open-terminal-orchestrator@localhost:5432/oto` | PostgreSQL connection string. The `postgresql://` prefix is auto-converted to `postgresql+asyncpg://`. |
 
 ### External Services
 
@@ -191,7 +191,7 @@ All configuration is read from environment variables by the backend `Settings` c
 
 | Variable | Default | Description |
 |---|---|---|
-| `USER_DATA_BASE_DIR` | `/var/lib/shellguard/user-data` | Base directory for per-user data volumes |
+| `USER_DATA_BASE_DIR` | `/var/lib/oto/user-data` | Base directory for per-user data volumes |
 
 ### Pool Configuration
 
@@ -200,7 +200,7 @@ All configuration is read from environment variables by the backend `Settings` c
 | `POOL_WARMUP_SIZE` | `2` | Number of pre-warmed sandboxes to maintain |
 | `POOL_MAX_SANDBOXES` | `20` | Maximum total sandboxes |
 | `POOL_MAX_ACTIVE` | `10` | Maximum concurrently active sandboxes |
-| `DEFAULT_IMAGE_TAG` | `shellguard-sandbox:slim` | Docker image tag for sandbox containers |
+| `DEFAULT_IMAGE_TAG` | `oto-sandbox:slim` | Docker image tag for sandbox containers |
 
 ### Lifecycle Timeouts
 
@@ -227,7 +227,7 @@ All configuration is read from environment variables by the backend `Settings` c
 | `OIDC_ISSUER` | (empty) | OIDC provider issuer URL (e.g., Authentik, Keycloak) |
 | `OIDC_CLIENT_ID` | (empty) | OIDC client ID |
 | `OIDC_CLIENT_SECRET` | (empty) | OIDC client secret |
-| `OIDC_REDIRECT_URI` | (empty) | OIDC callback URL (e.g., `https://shellguard.example.com/admin/api/auth/oidc/callback`) |
+| `OIDC_REDIRECT_URI` | (empty) | OIDC callback URL (e.g., `https://oto.example.com/admin/api/auth/oidc/callback`) |
 | `OIDC_SCOPES` | `openid email profile` | OIDC scopes to request |
 | `OIDC_SESSION_SECRET` | (empty, auto-generated) | Secret for signing session JWTs |
 
@@ -254,31 +254,31 @@ All configuration is read from environment variables by the backend `Settings` c
 
 ## Database Initialization
 
-ShellGuard uses SQLAlchemy with Alembic-style migrations. On first startup, the backend automatically creates the required tables if they do not exist.
+Open Terminal Orchestrator uses SQLAlchemy with Alembic-style migrations. On first startup, the backend automatically creates the required tables if they do not exist.
 
 For manual schema management, migration files are located in `supabase/migrations/`. These can be applied using the Supabase CLI or directly against PostgreSQL:
 
 ```bash
 # Apply migrations manually (if not using auto-creation)
-psql -h localhost -U shellguard -d shellguard -f supabase/migrations/001_initial.sql
+psql -h localhost -U oto -d oto -f supabase/migrations/001_initial.sql
 ```
 
 ### Backup and Restore
 
-ShellGuard provides a built-in backup endpoint that exports all policies, policy versions, assignments, groups, and system configuration as a JSON archive:
+Open Terminal Orchestrator provides a built-in backup endpoint that exports all policies, policy versions, assignments, groups, and system configuration as a JSON archive:
 
 ```bash
 curl -H "Authorization: Bearer YOUR_ADMIN_API_KEY" \
      -X POST http://localhost:8080/admin/api/backup \
-     -o shellguard-backup-$(date +%Y%m%d).json
+     -o oto-backup-$(date +%Y%m%d).json
 ```
 
 For full database backups (including audit logs and sandbox records), use standard PostgreSQL tools:
 
 ```bash
 # Backup
-pg_dump -h localhost -U shellguard shellguard > shellguard-full-backup.sql
+pg_dump -h localhost -U oto oto > oto-full-backup.sql
 
 # Restore
-psql -h localhost -U shellguard shellguard < shellguard-full-backup.sql
+psql -h localhost -U oto oto < oto-full-backup.sql
 ```

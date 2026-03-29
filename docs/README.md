@@ -1,12 +1,12 @@
-# ShellGuard Documentation
+# Open Terminal Orchestrator Documentation
 
-Welcome to the ShellGuard documentation. ShellGuard is an open-source orchestration layer that provides secure, per-user terminal sandboxes for [Open WebUI](https://github.com/open-webui/open-webui). It combines a React admin dashboard with a FastAPI backend to deliver policy-enforced sandbox isolation, real-time monitoring, and comprehensive audit logging.
+Welcome to the Open Terminal Orchestrator documentation. Open Terminal Orchestrator is an open-source orchestration layer that provides secure, per-user terminal sandboxes for [Open WebUI](https://github.com/open-webui/open-webui). It combines a React admin dashboard with a FastAPI backend to deliver policy-enforced sandbox isolation, real-time monitoring, and comprehensive audit logging.
 
 ---
 
 ## Quick Links
 
-- [Getting Started](user-guide/getting-started.md) -- Set up ShellGuard in under 10 minutes
+- [Getting Started](user-guide/getting-started.md) -- Set up Open Terminal Orchestrator in under 10 minutes
 - [Configuration Reference](admin-guide/configuration-reference.md) -- All environment variables and settings
 - [API Reference](architecture/api-reference.md) -- Proxy and management API endpoints
 - [Troubleshooting](operations/troubleshooting.md) -- Diagnose and resolve common issues
@@ -15,7 +15,7 @@ Welcome to the ShellGuard documentation. ShellGuard is an open-source orchestrat
 
 ## For Operators
 
-Day-to-day guides for operators who manage ShellGuard through the admin dashboard.
+Day-to-day guides for operators who manage Open Terminal Orchestrator through the admin dashboard.
 
 | Document | Description |
 |----------|-------------|
@@ -60,7 +60,7 @@ Technical architecture, API documentation, and security review.
 
 ## For Developers
 
-Guides for contributors extending ShellGuard.
+Guides for contributors extending Open Terminal Orchestrator.
 
 | Document | Description |
 |----------|-------------|
@@ -116,4 +116,4 @@ This builds and pushes the site to the `gh-pages` branch automatically.
 
 ## License
 
-ShellGuard is released under the MIT License. See [LICENSE](../LICENSE) for details.
+Open Terminal Orchestrator is released under the MIT License. See [LICENSE](../LICENSE) for details.

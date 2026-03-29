@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # Ensure DATABASE_URL is set before importing app modules.
 os.environ.setdefault(
     "DATABASE_URL",
-    "postgresql+asyncpg://shellguard:shellguard@localhost:5432/shellguard",
+    "postgresql+asyncpg://oto:oto@localhost:5432/oto",
 )
 
 from app.database import Base  # noqa: E402

@@ -1,10 +1,10 @@
 # Backend Development Guide
 
-This guide covers the architecture, conventions, and workflows for developing the ShellGuard backend.
+This guide covers the architecture, conventions, and workflows for developing the Open Terminal Orchestrator backend.
 
 ## Architecture Overview
 
-The ShellGuard backend is a Python application built with:
+The Open Terminal Orchestrator backend is a Python application built with:
 
 | Technology | Version | Purpose |
 |------------|---------|---------|

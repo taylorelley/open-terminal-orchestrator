@@ -1,10 +1,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: shellguard
-  namespace: shellguard
+  name: oto
+  namespace: oto
   labels:
-    app.kubernetes.io/name: shellguard
+    app.kubernetes.io/name: oto
     app.kubernetes.io/component: server
   annotations:
     # cert-manager: uncomment and set issuer name to enable automatic TLS
@@ -13,16 +13,16 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - shellguard.example.com
-      secretName: shellguard-tls
+        - oto.example.com
+      secretName: oto-tls
   rules:
-    - host: shellguard.example.com
+    - host: oto.example.com
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: shellguard
+                name: oto
                 port:
                   number: 8080

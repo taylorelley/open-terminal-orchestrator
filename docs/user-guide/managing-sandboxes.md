@@ -1,6 +1,6 @@
 # Managing Sandboxes
 
-Sandboxes are the core unit in ShellGuard -- isolated terminal containers provisioned for each user session. This guide covers the sandbox lifecycle, day-to-day management, pool configuration, and monitoring.
+Sandboxes are the core unit in Open Terminal Orchestrator -- isolated terminal containers provisioned for each user session. This guide covers the sandbox lifecycle, day-to-day management, pool configuration, and monitoring.
 
 ---
 
@@ -138,13 +138,13 @@ Configure pool behavior in **Settings > Pool Settings** or via environment varia
 
 | Setting | Environment Variable | Default | Description |
 |---------|---------------------|---------|-------------|
-| **Warmup Size** | `POOL_WARMUP_SIZE` | `3` | Target number of READY containers to maintain in the pool. ShellGuard automatically provisions new containers when the pool drops below this count. |
+| **Warmup Size** | `POOL_WARMUP_SIZE` | `3` | Target number of READY containers to maintain in the pool. Open Terminal Orchestrator automatically provisions new containers when the pool drops below this count. |
 | **Max Sandboxes** | `MAX_SANDBOXES` | `50` | Hard limit on total sandbox containers across all states (excluding DESTROYED). When reached, new sessions queue until capacity is available. |
 | **Max Active Per User** | `MAX_ACTIVE_PER_USER` | `1` | Maximum concurrent ACTIVE sandboxes per user. Additional session requests reuse the existing active sandbox or queue. |
 
 ### How Pooling Works
 
-1. On startup, ShellGuard provisions containers up to the warmup size. Each transitions through POOL, WARMING, and READY.
+1. On startup, Open Terminal Orchestrator provisions containers up to the warmup size. Each transitions through POOL, WARMING, and READY.
 2. When a user requests a terminal session, a READY container is assigned and transitions to ACTIVE.
 3. The pool manager detects the reduced pool count and begins warming a replacement container.
 4. If no READY containers are available, the request waits (up to `STARTUP_TIMEOUT`) for a container to become ready.
@@ -172,7 +172,7 @@ To access a sandbox terminal:
 3. Click the **Open Terminal** button.
 4. An xterm.js terminal emulator opens within the dashboard, connected to the sandbox's Open Terminal PTY via WebSocket.
 
-Open WebUI users also get terminal access directly through Open WebUI's terminal integration, which connects to ShellGuard's `/ws/terminal` WebSocket endpoint and is transparently routed to their assigned sandbox.
+Open WebUI users also get terminal access directly through Open WebUI's terminal integration, which connects to Open Terminal Orchestrator's `/ws/terminal` WebSocket endpoint and is transparently routed to their assigned sandbox.
 
 > **Note:** Admin terminal access is logged as an audit event. All commands executed by administrators are recorded separately from user activity.
 

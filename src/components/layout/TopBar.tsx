@@ -19,7 +19,7 @@ export function TopBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const title = routeTitles[pathname] || 'ShellGuard';
+  const title = routeTitles[pathname] || 'Open Terminal Orchestrator';
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {

@@ -1,4 +1,4 @@
-"""Sync users from Open WebUI into the ShellGuard users table."""
+"""Sync users from Open WebUI into the Open Terminal Orchestrator users table."""
 
 import logging
 import uuid

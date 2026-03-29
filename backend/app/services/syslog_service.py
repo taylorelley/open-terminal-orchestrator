@@ -31,7 +31,7 @@ class SyslogConfig(BaseModel):
     port: int = 514
     protocol: str = "udp"  # "udp" or "tcp"
     facility: int = 1  # user-level
-    app_name: str = "shellguard"
+    app_name: str = "oto"
 
 
 # ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ async def dispatch_syslog(
 
     severity = _category_to_severity(category)
     structured_data = {
-        "shellguard": {
+        "oto": {
             "category": category,
             "event_type": event_type,
             "timestamp": timestamp,

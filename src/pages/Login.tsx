@@ -51,8 +51,8 @@ export default function Login() {
           <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-teal-500/20">
             <Terminal className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-white">ShellGuard</h1>
-          <p className="text-sm text-zinc-500 mt-1">Terminal Orchestration Console</p>
+          <h1 className="text-xl font-bold text-white">Open Terminal Orchestrator</h1>
+          <p className="text-sm text-zinc-500 mt-1">Sandbox Management Console</p>
         </div>
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
@@ -137,7 +137,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-[11px] text-zinc-600 mt-6">
-          Secure Terminal Orchestration for Open WebUI
+          Secure Terminal Sandboxes for Open WebUI
         </p>
       </div>
     </div>

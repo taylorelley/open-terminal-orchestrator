@@ -14,32 +14,32 @@ REGISTRY = CollectorRegistry()
 # ---------------------------------------------------------------------------
 
 SANDBOX_COUNT = Gauge(
-    "shellguard_sandbox_count",
+    "oto_sandbox_count",
     "Number of sandboxes by state",
     ["state"],
     registry=REGISTRY,
 )
 
 SANDBOX_TOTAL = Gauge(
-    "shellguard_sandbox_total",
+    "oto_sandbox_total",
     "Total number of sandboxes",
     registry=REGISTRY,
 )
 
 POLICY_COUNT = Gauge(
-    "shellguard_policy_count",
+    "oto_policy_count",
     "Number of policies",
     registry=REGISTRY,
 )
 
 USER_COUNT = Gauge(
-    "shellguard_user_count",
+    "oto_user_count",
     "Number of registered users",
     registry=REGISTRY,
 )
 
 GROUP_COUNT = Gauge(
-    "shellguard_group_count",
+    "oto_group_count",
     "Number of groups",
     registry=REGISTRY,
 )
@@ -49,14 +49,14 @@ GROUP_COUNT = Gauge(
 # ---------------------------------------------------------------------------
 
 AUDIT_EVENTS = Counter(
-    "shellguard_audit_events_total",
+    "oto_audit_events_total",
     "Audit log events",
     ["category", "event_type"],
     registry=REGISTRY,
 )
 
 REQUEST_COUNT = Counter(
-    "shellguard_http_requests_total",
+    "oto_http_requests_total",
     "HTTP requests",
     ["method", "path", "status"],
     registry=REGISTRY,
@@ -67,14 +67,14 @@ REQUEST_COUNT = Counter(
 # ---------------------------------------------------------------------------
 
 REQUEST_LATENCY = Histogram(
-    "shellguard_http_request_duration_seconds",
+    "oto_http_request_duration_seconds",
     "HTTP request latency in seconds",
     ["method", "path"],
     registry=REGISTRY,
 )
 
 SANDBOX_STARTUP_DURATION = Histogram(
-    "shellguard_sandbox_startup_duration_seconds",
+    "oto_sandbox_startup_duration_seconds",
     "Time for a sandbox to transition from WARMING to READY",
     buckets=(0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
     registry=REGISTRY,
@@ -85,7 +85,7 @@ SANDBOX_STARTUP_DURATION = Histogram(
 # ---------------------------------------------------------------------------
 
 POOL_UTILIZATION = Gauge(
-    "shellguard_pool_utilization_ratio",
+    "oto_pool_utilization_ratio",
     "Ratio of active sandboxes to max_active limit",
     registry=REGISTRY,
 )
@@ -95,7 +95,7 @@ POOL_UTILIZATION = Gauge(
 # ---------------------------------------------------------------------------
 
 WEBHOOK_DELIVERIES = Counter(
-    "shellguard_webhook_deliveries_total",
+    "oto_webhook_deliveries_total",
     "Webhook delivery attempts",
     ["status", "url"],
     registry=REGISTRY,

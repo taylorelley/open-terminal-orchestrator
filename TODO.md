@@ -1,4 +1,4 @@
-# ShellGuard — TODO
+# Open Terminal Orchestrator — TODO
 
 Project completeness assessment against [PRD.md](./PRD.md).
 
@@ -40,8 +40,8 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] **Add LICENSE file**: MIT License added
 - [x] **Add SECURITY.md**: Vulnerability reporting process documented
 - [x] **Security review**: Threat model, OWASP Top 10 assessment, dependency audit, RLS review in `docs/security-review.md`
-- [x] **Fix `package.json` metadata**: Updated to `shellguard@0.1.0`
-- [x] **CLI tool for policy management**: `shellguard-cli` with policy/sandbox/user subcommands in `backend/app/cli.py`
+- [x] **Fix `package.json` metadata**: Updated to `open-terminal-orchestrator@0.1.0`
+- [x] **CLI tool for policy management**: `oto-cli` with policy/sandbox/user subcommands in `backend/app/cli.py`
 
 ### P2 — Medium
 
@@ -183,9 +183,9 @@ Project completeness assessment against [PRD.md](./PRD.md).
 
 ## 9. BYOC Sandbox Image — P1 (PRD Section 5.3)
 
-- [x] Create `shellguard-sandbox/Dockerfile` (slim variant from `open-terminal:slim`)
+- [x] Create `oto-sandbox/Dockerfile` (slim variant from `open-terminal:slim`)
 - [x] Add health check (`curl -sf http://localhost:8000/health`)
-- [x] Create `shellguard-sandbox/Dockerfile.full` (full variant from `open-terminal:latest`)
+- [x] Create `oto-sandbox/Dockerfile.full` (full variant from `open-terminal:latest`)
 - [x] Register image with OpenShell as local BYOC source
 - [x] Document image customization for additional tooling
 
@@ -206,13 +206,13 @@ Project completeness assessment against [PRD.md](./PRD.md).
 ## 11. Deployment — P2 (PRD Section 13)
 
 - [x] `docker-compose.yml` — reference deployment (orchestrator + PostgreSQL + frontend)
-- [x] `Dockerfile` — ShellGuard orchestrator container (multi-stage: Node + Python)
+- [x] `Dockerfile` — Open Terminal Orchestrator orchestrator container (multi-stage: Node + Python)
 - [x] Kubernetes/K3s manifests for production deployment
 - [x] Environment variable documentation and `.env.example`
 - [x] Database initialization and migration scripts (Alembic for non-Supabase PostgreSQL)
 - [x] TLS/reverse proxy configuration guide
 - [x] CI/CD pipeline (`.github/workflows/ci.yml`) — frontend (lint, typecheck, build, test) + backend (pytest) jobs
-- [x] Fix `package.json` metadata — updated to `shellguard@0.1.0`
+- [x] Fix `package.json` metadata — updated to `open-terminal-orchestrator@0.1.0`
 
 ## 12. Testing — P2
 
@@ -238,5 +238,5 @@ Project completeness assessment against [PRD.md](./PRD.md).
 - [x] Add LICENSE file (MIT)
 - [x] Add SECURITY.md (vulnerability reporting process)
 - [x] Security review — threat model, dependency audit, OWASP check in `docs/security-review.md`
-- [x] CLI tool for policy management and diagnostics (`shellguard-cli` in `backend/app/cli.py`)
+- [x] CLI tool for policy management and diagnostics (`oto-cli` in `backend/app/cli.py`)
 - [x] Populate `node_modules/` — `npm install` done; all frontend tooling works

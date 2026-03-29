@@ -47,7 +47,7 @@ def make_sandbox():
         warming_started_at: datetime | None = None,
         pending_recreation: bool = False,
         internal_ip: str = "10.0.0.1",
-        image_tag: str = "shellguard-sandbox:slim",
+        image_tag: str = "oto-sandbox:slim",
     ) -> SimpleNamespace:
         now = _utcnow()
         return SimpleNamespace(

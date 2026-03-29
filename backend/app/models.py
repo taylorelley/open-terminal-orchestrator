@@ -1,6 +1,6 @@
 """SQLAlchemy ORM models mapped to the existing Supabase schema.
 
-Schema is defined in: supabase/migrations/20260326203442_create_shellguard_schema.sql
+Schema is defined in: supabase/migrations/20260326203442_create_oto_schema.sql
 These models are read/write adapters only — never call Base.metadata.create_all().
 """
 
@@ -81,7 +81,7 @@ class Sandbox(Base):
     state: Mapped[str] = mapped_column(Text, nullable=False, default="POOL")
     policy_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("policies.id", ondelete="SET NULL"), nullable=True)
     internal_ip: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    image_tag: Mapped[str] = mapped_column(Text, nullable=False, default="shellguard-sandbox:slim")
+    image_tag: Mapped[str] = mapped_column(Text, nullable=False, default="oto-sandbox:slim")
     data_dir: Mapped[str] = mapped_column(Text, nullable=False, default="")
     gpu_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     cpu_usage: Mapped[float] = mapped_column(Float, nullable=False, default=0)

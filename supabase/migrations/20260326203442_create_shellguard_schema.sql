@@ -1,5 +1,5 @@
 /*
-  # ShellGuard Management Schema
+  # Open Terminal Orchestrator Management Schema
 
   1. New Tables
     - `policies` - Security policy definitions (restricted, standard, elevated)
@@ -21,7 +21,7 @@
       - `created_by` (uuid, FK -> auth.users)
       - `created_at` (timestamptz)
 
-    - `groups` - ShellGuard user groups for policy assignment
+    - `groups` - Open Terminal Orchestrator user groups for policy assignment
       - `id` (uuid, primary key)
       - `name` (text, unique)
       - `description` (text)
@@ -29,7 +29,7 @@
       - `created_at` (timestamptz)
       - `updated_at` (timestamptz)
 
-    - `users` - Open WebUI user records synced into ShellGuard
+    - `users` - Open WebUI user records synced into Open Terminal Orchestrator
       - `id` (uuid, primary key)
       - `owui_id` (text, unique) - Open WebUI user identifier
       - `username` (text)
@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS sandboxes (
   state text NOT NULL DEFAULT 'POOL' CHECK (state IN ('POOL', 'WARMING', 'READY', 'ACTIVE', 'SUSPENDED', 'DESTROYED')),
   policy_id uuid REFERENCES policies(id) ON DELETE SET NULL,
   internal_ip text NOT NULL DEFAULT '',
-  image_tag text NOT NULL DEFAULT 'shellguard-sandbox:slim',
+  image_tag text NOT NULL DEFAULT 'oto-sandbox:slim',
   gpu_enabled boolean NOT NULL DEFAULT false,
   cpu_usage real NOT NULL DEFAULT 0,
   memory_usage real NOT NULL DEFAULT 0,

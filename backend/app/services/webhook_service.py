@@ -133,7 +133,7 @@ async def _deliver(webhook: WebhookConfig, payload: dict) -> None:
     headers: dict[str, str] = {"Content-Type": "application/json"}
     if webhook.secret:
         sig = _sign_payload(webhook.secret, body)
-        headers["X-ShellGuard-Signature"] = f"sha256={sig}"
+        headers["X-OTO-Signature"] = f"sha256={sig}"
 
     for attempt in range(_MAX_ATTEMPTS):
         try:

@@ -1,25 +1,25 @@
 # TLS / Reverse Proxy Configuration
 
-ShellGuard listens on port 8080 (HTTP) by default. In production, place a reverse proxy in front to handle TLS termination. Below are sample configurations for three popular reverse proxies.
+Open Terminal Orchestrator listens on port 8080 (HTTP) by default. In production, place a reverse proxy in front to handle TLS termination. Below are sample configurations for three popular reverse proxies.
 
 ## nginx
 
 ```nginx
-upstream shellguard {
+upstream oto {
     server 127.0.0.1:8080;
 }
 
 server {
     listen 443 ssl http2;
-    server_name shellguard.example.com;
+    server_name oto.example.com;
 
-    ssl_certificate     /etc/letsencrypt/live/shellguard.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/shellguard.example.com/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/oto.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/oto.example.com/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
 
     # Proxy API and admin UI
     location / {
-        proxy_pass http://shellguard;
+        proxy_pass http://oto;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -28,7 +28,7 @@ server {
 
     # WebSocket upgrade for terminal connections
     location /admin/api/sandboxes/ {
-        proxy_pass http://shellguard;
+        proxy_pass http://oto;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -40,7 +40,7 @@ server {
 
 server {
     listen 80;
-    server_name shellguard.example.com;
+    server_name oto.example.com;
     return 301 https://$host$request_uri;
 }
 ```
@@ -48,7 +48,7 @@ server {
 ### Certificate setup with certbot
 
 ```bash
-sudo certbot --nginx -d shellguard.example.com
+sudo certbot --nginx -d oto.example.com
 ```
 
 ## Caddy
@@ -56,7 +56,7 @@ sudo certbot --nginx -d shellguard.example.com
 Caddy provides automatic HTTPS via Let's Encrypt with zero configuration:
 
 ```Caddyfile
-shellguard.example.com {
+oto.example.com {
     reverse_proxy localhost:8080
 }
 ```
@@ -74,19 +74,19 @@ For standalone Docker or K3s deployments:
 # traefik dynamic config (file provider)
 http:
   routers:
-    shellguard:
-      rule: "Host(`shellguard.example.com`)"
+    oto:
+      rule: "Host(`oto.example.com`)"
       entryPoints:
         - websecure
-      service: shellguard
+      service: oto
       tls:
         certResolver: letsencrypt
 
   services:
-    shellguard:
+    oto:
       loadBalancer:
         servers:
-          - url: "http://shellguard:8080"
+          - url: "http://oto:8080"
 ```
 
 ### K3s IngressRoute (Traefik CRD)
@@ -95,16 +95,16 @@ http:
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: shellguard
-  namespace: shellguard
+  name: oto
+  namespace: oto
 spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`shellguard.example.com`)
+    - match: Host(`oto.example.com`)
       kind: Rule
       services:
-        - name: shellguard
+        - name: oto
           port: 8080
   tls:
     certResolver: letsencrypt
@@ -114,7 +114,7 @@ spec:
 
 After configuring your reverse proxy, verify:
 
-1. **HTTPS works**: `curl -I https://shellguard.example.com/health`
-2. **WebSocket works**: Connect to `wss://shellguard.example.com/admin/api/sandboxes/{id}/terminal`
-3. **Redirect works**: `curl -I http://shellguard.example.com` should return 301
+1. **HTTPS works**: `curl -I https://oto.example.com/health`
+2. **WebSocket works**: Connect to `wss://oto.example.com/admin/api/sandboxes/{id}/terminal`
+3. **Redirect works**: `curl -I http://oto.example.com` should return 301
 4. **Headers forwarded**: Check that `X-Forwarded-For` appears in audit logs

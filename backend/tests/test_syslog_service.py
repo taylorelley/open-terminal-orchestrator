@@ -24,9 +24,9 @@ class TestFormatRFC5424:
         msg = format_rfc5424(
             facility=1,
             severity=6,
-            app_name="shellguard",
+            app_name="oto",
             msg_id="test_event",
-            structured_data={"shellguard": {"category": "lifecycle", "event_type": "assigned"}},
+            structured_data={"oto": {"category": "lifecycle", "event_type": "assigned"}},
             message='{"user":"alice"}',
         )
         decoded = msg.decode("utf-8")
@@ -34,11 +34,11 @@ class TestFormatRFC5424:
         # Should start with PRI (1*8+6 = 14)
         assert decoded.startswith("<14>1 ")
         # Should contain app name
-        assert "shellguard" in decoded
+        assert "oto" in decoded
         # Should contain msg_id
         assert "test_event" in decoded
         # Should contain structured data
-        assert '[shellguard category="lifecycle" event_type="assigned"]' in decoded
+        assert '[oto category="lifecycle" event_type="assigned"]' in decoded
         # Should end with message + newline
         assert decoded.strip().endswith('{"user":"alice"}')
 
@@ -141,7 +141,7 @@ class TestDispatchSyslog:
         assert decoded.startswith("<12>1 ")
         assert "sg" in decoded  # app_name
         assert "policy_applied" in decoded  # msg_id
-        assert '[shellguard category="enforcement"' in decoded
+        assert '[oto category="enforcement"' in decoded
 
 
 # ---------------------------------------------------------------------------

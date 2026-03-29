@@ -1,6 +1,6 @@
 # Developer Setup Guide
 
-This guide walks you through setting up a local ShellGuard development environment from scratch.
+This guide walks you through setting up a local Open Terminal Orchestrator development environment from scratch.
 
 ## Prerequisites
 
@@ -27,8 +27,8 @@ git --version     # git version 2.x.x
 ## Clone the Repository
 
 ```bash
-git clone https://github.com/shellguard/shellguard.git
-cd shellguard
+git clone https://github.com/oto/open-terminal-orchestrator.git
+cd open-terminal-orchestrator
 ```
 
 ## Database Setup
@@ -36,13 +36,13 @@ cd shellguard
 The easiest way to run PostgreSQL locally is via Docker Compose. The project includes a Compose file with a pre-configured database service.
 
 ```bash
-docker compose up -d shellguard-db
+docker compose up -d oto-db
 ```
 
 This starts a PostgreSQL 16 instance with the default development credentials. To verify:
 
 ```bash
-docker compose ps shellguard-db
+docker compose ps oto-db
 # Should show status: running
 
 pg_isready -h localhost -p 5432
@@ -56,7 +56,7 @@ To apply the database schema and migrations:
 supabase db push
 
 # Or apply manually
-psql "postgresql://postgres:postgres@localhost:5432/shellguard" \
+psql "postgresql://postgres:postgres@localhost:5432/oto" \
   -f supabase/migrations/*.sql
 ```
 
@@ -85,7 +85,7 @@ psql "postgresql://postgres:postgres@localhost:5432/shellguard" \
    Edit `backend/.env` and configure at minimum:
 
    ```env
-   DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/shellguard
+   DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/oto
    ADMIN_API_KEY=dev-admin-key-change-in-production
    LOG_LEVEL=debug
    ```
@@ -137,7 +137,7 @@ psql "postgresql://postgres:postgres@localhost:5432/shellguard" \
 
 4. **Verify the frontend is running:**
 
-   Open `http://localhost:5173` in your browser. You should see the ShellGuard login page.
+   Open `http://localhost:5173` in your browser. You should see the Open Terminal Orchestrator login page.
 
 ## Running Checks
 
@@ -206,9 +206,9 @@ npm run dev
 To reset the database to a clean state:
 
 ```bash
-docker compose down shellguard-db
-docker volume rm shellguard_db_data   # Remove persistent data
-docker compose up -d shellguard-db
+docker compose down oto-db
+docker volume rm oto_db_data   # Remove persistent data
+docker compose up -d oto-db
 # Re-apply migrations
 ```
 

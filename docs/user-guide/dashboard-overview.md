@@ -1,6 +1,6 @@
 # Dashboard Overview
 
-This guide introduces the ShellGuard admin dashboard -- the central interface for managing sandboxes, policies, users, and monitoring your deployment.
+This guide introduces the Open Terminal Orchestrator admin dashboard -- the central interface for managing sandboxes, policies, users, and monitoring your deployment.
 
 ---
 
@@ -24,7 +24,7 @@ The **top bar** displays the current page title, a global search input, notifica
 
 ## Dashboard Page
 
-The Dashboard is the landing page after login. It provides a high-level view of your ShellGuard deployment.
+The Dashboard is the landing page after login. It provides a high-level view of your Open Terminal Orchestrator deployment.
 
 ### Stat Cards
 

@@ -1,6 +1,6 @@
-# ShellGuard Operator Runbook
+# Open Terminal Orchestrator Operator Runbook
 
-This document covers operational procedures, troubleshooting, backup/restore, and log analysis for ShellGuard.
+This document covers operational procedures, troubleshooting, backup/restore, and log analysis for Open Terminal Orchestrator.
 
 ## Health Checks
 
@@ -52,14 +52,14 @@ curl -H "Authorization: Bearer YOUR_API_KEY" \
      http://localhost:8080/admin/api/sandboxes?state=WARMING
 ```
 
-2. Check ShellGuard backend logs for OpenShell errors:
+2. Check Open Terminal Orchestrator backend logs for OpenShell errors:
 
 ```bash
 # Docker Compose
-docker compose logs shellguard | grep -i "warming\|openshell\|sandbox create"
+docker compose logs oto | grep -i "warming\|openshell\|sandbox create"
 
 # K3s
-kubectl -n shellguard logs deployment/shellguard | grep -i "warming\|openshell"
+kubectl -n oto logs deployment/oto | grep -i "warming\|openshell"
 ```
 
 3. Check OpenShell gateway status:
@@ -96,22 +96,22 @@ The pool manager will create a replacement pre-warmed sandbox automatically.
 
 ```bash
 # Docker Compose
-docker compose ps shellguard-db
-docker compose logs shellguard-db
+docker compose ps oto-db
+docker compose logs oto-db
 
 # K3s
-kubectl -n shellguard get pods -l app=shellguard-db
-kubectl -n shellguard logs statefulset/shellguard-db
+kubectl -n oto get pods -l app=oto-db
+kubectl -n oto logs statefulset/oto-db
 ```
 
 2. Test database connectivity directly:
 
 ```bash
 # Docker Compose
-docker compose exec shellguard-db pg_isready -U shellguard
+docker compose exec oto-db pg_isready -U oto
 
 # K3s
-kubectl -n shellguard exec statefulset/shellguard-db -- pg_isready -U shellguard
+kubectl -n oto exec statefulset/oto-db -- pg_isready -U oto
 ```
 
 3. Check the `DATABASE_URL` environment variable matches the actual database host, port, user, and password.
@@ -120,7 +120,7 @@ kubectl -n shellguard exec statefulset/shellguard-db -- pg_isready -U shellguard
 
 | Cause | Fix |
 |---|---|
-| Database container crashed | `docker compose restart shellguard-db` or delete the pod to let K3s reschedule |
+| Database container crashed | `docker compose restart oto-db` or delete the pod to let K3s reschedule |
 | Disk full on database volume | Expand the volume or clean up old audit logs |
 | Connection limit exceeded | Increase `max_connections` in PostgreSQL config; check for connection leaks |
 | Password mismatch | Verify `SG_DB_PASS` / `DATABASE_URL` match the database credentials |
@@ -148,14 +148,14 @@ curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \
 3. Check backend logs for delivery errors:
 
 ```bash
-docker compose logs shellguard | grep -i "webhook"
+docker compose logs oto | grep -i "webhook"
 ```
 
 **Common causes and fixes:**
 
 | Cause | Fix |
 |---|---|
-| Webhook URL unreachable | Verify URL and network access from the ShellGuard container |
+| Webhook URL unreachable | Verify URL and network access from the Open Terminal Orchestrator container |
 | TLS certificate errors | Ensure the webhook endpoint's certificate is trusted |
 | Webhook disabled | Check `enabled` field in webhook config |
 | Event filter too restrictive | Review `event_filters` -- an empty list matches all events |
@@ -232,12 +232,12 @@ curl -H "Authorization: Bearer YOUR_API_KEY" \
 
 ### Configuration Backup
 
-ShellGuard provides a built-in backup endpoint that exports all policies, policy versions, assignments, groups, and system configuration:
+Open Terminal Orchestrator provides a built-in backup endpoint that exports all policies, policy versions, assignments, groups, and system configuration:
 
 ```bash
 curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \
      http://localhost:8080/admin/api/backup \
-     -o "shellguard-backup-$(date +%Y%m%dT%H%M%SZ).json"
+     -o "oto-backup-$(date +%Y%m%dT%H%M%SZ).json"
 ```
 
 The backup JSON includes:
@@ -252,7 +252,7 @@ Schedule this regularly (e.g., via cron):
 ```bash
 0 2 * * * curl -s -X POST -H "Authorization: Bearer YOUR_API_KEY" \
   http://localhost:8080/admin/api/backup \
-  -o /backups/shellguard/shellguard-backup-$(date +\%Y\%m\%dT\%H\%M\%SZ).json
+  -o /backups/oto/oto-backup-$(date +\%Y\%m\%dT\%H\%M\%SZ).json
 ```
 
 ### Full Database Backup
@@ -261,12 +261,12 @@ For a complete backup including audit logs, sandbox records, and metric snapshot
 
 ```bash
 # Docker Compose
-docker compose exec shellguard-db \
-  pg_dump -U shellguard shellguard > shellguard-full-$(date +%Y%m%d).sql
+docker compose exec oto-db \
+  pg_dump -U oto oto > oto-full-$(date +%Y%m%d).sql
 
 # K3s
-kubectl -n shellguard exec statefulset/shellguard-db -- \
-  pg_dump -U shellguard shellguard > shellguard-full-$(date +%Y%m%d).sql
+kubectl -n oto exec statefulset/oto-db -- \
+  pg_dump -U oto oto > oto-full-$(date +%Y%m%d).sql
 ```
 
 ### Restore
@@ -275,15 +275,15 @@ To restore a full database backup:
 
 ```bash
 # Docker Compose
-cat shellguard-full-YYYYMMDD.sql | \
-  docker compose exec -T shellguard-db psql -U shellguard shellguard
+cat oto-full-YYYYMMDD.sql | \
+  docker compose exec -T oto-db psql -U oto oto
 
 # K3s
-cat shellguard-full-YYYYMMDD.sql | \
-  kubectl -n shellguard exec -i statefulset/shellguard-db -- psql -U shellguard shellguard
+cat oto-full-YYYYMMDD.sql | \
+  kubectl -n oto exec -i statefulset/oto-db -- psql -U oto oto
 ```
 
-After restoring, restart the ShellGuard backend to reload configuration from the database.
+After restoring, restart the Open Terminal Orchestrator backend to reload configuration from the database.
 
 ---
 
@@ -291,14 +291,14 @@ After restoring, restart the ShellGuard backend to reload configuration from the
 
 ### Backend Logs
 
-ShellGuard logs to stdout in structured format. The log level is controlled by the `LOG_LEVEL` environment variable (default: `info`).
+Open Terminal Orchestrator logs to stdout in structured format. The log level is controlled by the `LOG_LEVEL` environment variable (default: `info`).
 
 ```bash
 # Docker Compose
-docker compose logs -f shellguard
+docker compose logs -f oto
 
 # K3s
-kubectl -n shellguard logs -f deployment/shellguard
+kubectl -n oto logs -f deployment/oto
 ```
 
 ### Key Log Patterns
@@ -354,7 +354,7 @@ Maximum export size is 10,000 entries per request. Use time-range filters to exp
 
 ### Prometheus Metrics
 
-ShellGuard exposes Prometheus-compatible metrics:
+Open Terminal Orchestrator exposes Prometheus-compatible metrics:
 
 ```bash
 curl -H "Authorization: Bearer YOUR_API_KEY" \

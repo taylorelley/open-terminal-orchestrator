@@ -3,7 +3,7 @@
     {
       "name": "DS_PROMETHEUS",
       "label": "Prometheus",
-      "description": "Prometheus datasource for ShellGuard metrics",
+      "description": "Prometheus datasource for Open Terminal Orchestrator metrics",
       "type": "datasource",
       "pluginId": "prometheus",
       "pluginName": "Prometheus"
@@ -12,7 +12,7 @@
   "annotations": {
     "list": []
   },
-  "description": "ShellGuard orchestrator metrics — sandbox lifecycle, pool utilization, HTTP traffic, audit events, and webhooks.",
+  "description": "Open Terminal Orchestrator metrics — sandbox lifecycle, pool utilization, HTTP traffic, audit events, and webhooks.",
   "editable": true,
   "id": null,
   "links": [],
@@ -34,7 +34,7 @@
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Sandboxes Total",
       "targets": [
-        { "expr": "shellguard_sandbox_total", "legendFormat": "total", "refId": "A" }
+        { "expr": "oto_sandbox_total", "legendFormat": "total", "refId": "A" }
       ],
       "type": "stat"
     },
@@ -59,7 +59,7 @@
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Pool Utilization",
       "targets": [
-        { "expr": "shellguard_pool_utilization_ratio", "legendFormat": "utilization", "refId": "A" }
+        { "expr": "oto_pool_utilization_ratio", "legendFormat": "utilization", "refId": "A" }
       ],
       "type": "gauge"
     },
@@ -73,7 +73,7 @@
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Policies",
       "targets": [
-        { "expr": "shellguard_policy_count", "legendFormat": "policies", "refId": "A" }
+        { "expr": "oto_policy_count", "legendFormat": "policies", "refId": "A" }
       ],
       "type": "stat"
     },
@@ -87,7 +87,7 @@
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Users",
       "targets": [
-        { "expr": "shellguard_user_count", "legendFormat": "users", "refId": "A" }
+        { "expr": "oto_user_count", "legendFormat": "users", "refId": "A" }
       ],
       "type": "stat"
     },
@@ -101,7 +101,7 @@
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Groups",
       "targets": [
-        { "expr": "shellguard_group_count", "legendFormat": "groups", "refId": "A" }
+        { "expr": "oto_group_count", "legendFormat": "groups", "refId": "A" }
       ],
       "type": "stat"
     },
@@ -122,7 +122,7 @@
       "options": { "stacking": { "mode": "normal" } },
       "title": "Sandboxes by State",
       "targets": [
-        { "expr": "shellguard_sandbox_count", "legendFormat": "{{ state }}", "refId": "A" }
+        { "expr": "oto_sandbox_count", "legendFormat": "{{ state }}", "refId": "A" }
       ],
       "type": "timeseries"
     },
@@ -135,9 +135,9 @@
       "id": 7,
       "title": "Sandbox Startup Duration",
       "targets": [
-        { "expr": "histogram_quantile(0.50, rate(shellguard_sandbox_startup_duration_seconds_bucket[$__rate_interval]))", "legendFormat": "p50", "refId": "A" },
-        { "expr": "histogram_quantile(0.95, rate(shellguard_sandbox_startup_duration_seconds_bucket[$__rate_interval]))", "legendFormat": "p95", "refId": "B" },
-        { "expr": "histogram_quantile(0.99, rate(shellguard_sandbox_startup_duration_seconds_bucket[$__rate_interval]))", "legendFormat": "p99", "refId": "C" }
+        { "expr": "histogram_quantile(0.50, rate(oto_sandbox_startup_duration_seconds_bucket[$__rate_interval]))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, rate(oto_sandbox_startup_duration_seconds_bucket[$__rate_interval]))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, rate(oto_sandbox_startup_duration_seconds_bucket[$__rate_interval]))", "legendFormat": "p99", "refId": "C" }
       ],
       "type": "timeseries"
     },
@@ -157,7 +157,7 @@
       "id": 8,
       "title": "HTTP Request Rate",
       "targets": [
-        { "expr": "sum(rate(shellguard_http_requests_total[$__rate_interval])) by (method)", "legendFormat": "{{ method }}", "refId": "A" }
+        { "expr": "sum(rate(oto_http_requests_total[$__rate_interval])) by (method)", "legendFormat": "{{ method }}", "refId": "A" }
       ],
       "type": "timeseries"
     },
@@ -170,9 +170,9 @@
       "id": 9,
       "title": "HTTP Request Latency",
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(shellguard_http_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p50", "refId": "A" },
-        { "expr": "histogram_quantile(0.95, sum(rate(shellguard_http_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p95", "refId": "B" },
-        { "expr": "histogram_quantile(0.99, sum(rate(shellguard_http_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p99", "refId": "C" }
+        { "expr": "histogram_quantile(0.50, sum(rate(oto_http_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(oto_http_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(oto_http_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p99", "refId": "C" }
       ],
       "type": "timeseries"
     },
@@ -192,7 +192,7 @@
       "id": 10,
       "title": "Audit Events Rate",
       "targets": [
-        { "expr": "sum(rate(shellguard_audit_events_total[$__rate_interval])) by (category)", "legendFormat": "{{ category }}", "refId": "A" }
+        { "expr": "sum(rate(oto_audit_events_total[$__rate_interval])) by (category)", "legendFormat": "{{ category }}", "refId": "A" }
       ],
       "type": "timeseries"
     },
@@ -205,20 +205,20 @@
       "id": 11,
       "title": "Webhook Deliveries Rate",
       "targets": [
-        { "expr": "sum(rate(shellguard_webhook_deliveries_total[$__rate_interval])) by (status)", "legendFormat": "{{ status }}", "refId": "A" }
+        { "expr": "sum(rate(oto_webhook_deliveries_total[$__rate_interval])) by (status)", "legendFormat": "{{ status }}", "refId": "A" }
       ],
       "type": "timeseries"
     }
   ],
   "schemaVersion": 39,
-  "tags": ["shellguard", "orchestrator"],
+  "tags": ["oto", "orchestrator"],
   "templating": {
     "list": []
   },
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "ShellGuard Orchestrator",
-  "uid": "shellguard-overview",
+  "title": "Open Terminal Orchestrator",
+  "uid": "oto-overview",
   "version": 1
 }

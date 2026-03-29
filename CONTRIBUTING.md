@@ -1,6 +1,6 @@
-# Contributing to ShellGuard
+# Contributing to Open Terminal Orchestrator
 
-Thank you for your interest in contributing to ShellGuard. This guide covers setting up a development environment, running tests, and the pull request process.
+Thank you for your interest in contributing to Open Terminal Orchestrator. This guide covers setting up a development environment, running tests, and the pull request process.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ Thank you for your interest in contributing to ShellGuard. This guide covers set
 ## Repository Structure
 
 ```
-shellguard/
+oto/
 ├── src/                  # React frontend (TypeScript)
 ├── backend/              # FastAPI backend (Python)
 │   ├── app/
@@ -36,7 +36,7 @@ shellguard/
 
 ```bash
 git clone <repository-url>
-cd shellguard
+cd open-terminal-orchestrator
 ```
 
 ### 2. Start the Database
@@ -44,10 +44,10 @@ cd shellguard
 The easiest way to get a local PostgreSQL instance:
 
 ```bash
-docker compose up -d shellguard-db
+docker compose up -d oto-db
 ```
 
-This starts PostgreSQL 16 on port 5432 with user `shellguard` and database `shellguard`.
+This starts PostgreSQL 16 on port 5432 with user `oto` and database `oto`.
 
 ### 3. Set Up the Backend
 
@@ -61,7 +61,7 @@ pip install -e ".[test]"
 Create a `.env` file in the project root (or `backend/` directory):
 
 ```bash
-DATABASE_URL=postgresql://shellguard:shellguard@localhost:5432/shellguard
+DATABASE_URL=postgresql://oto:open-terminal-orchestrator@localhost:5432/oto
 ADMIN_API_KEY=dev-api-key
 LOG_LEVEL=debug
 ```
@@ -186,5 +186,5 @@ cd backend && python -m pytest -v
 | `cd backend && uvicorn app.main:app --reload` | Start backend with hot reload |
 | `cd backend && python -m pytest -v` | Run backend tests |
 | `docker compose up -d` | Start all services |
-| `docker compose up -d shellguard-db` | Start database only |
-| `docker compose logs -f shellguard` | Tail backend logs |
+| `docker compose up -d oto-db` | Start database only |
+| `docker compose logs -f oto` | Tail backend logs |

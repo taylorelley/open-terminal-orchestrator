@@ -316,7 +316,7 @@ class SyslogConfigUpdate(BaseModel):
     port: int = 514
     protocol: str = "udp"
     facility: int = 1
-    app_name: str = "shellguard"
+    app_name: str = "oto"
 
 
 # ---------------------------------------------------------------------------

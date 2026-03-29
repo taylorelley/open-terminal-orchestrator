@@ -1,6 +1,6 @@
-# ShellGuard Policy Authoring Guide
+# Open Terminal Orchestrator Policy Authoring Guide
 
-This document covers how to write, assign, and manage security policies in ShellGuard.
+This document covers how to write, assign, and manage security policies in Open Terminal Orchestrator.
 
 ## Overview
 
@@ -124,7 +124,7 @@ gpu:
 
 ## Tier System
 
-ShellGuard uses three predefined tiers as a classification system. Tiers are metadata labels that help administrators categorize policies; enforcement comes from the policy content, not the tier label.
+Open Terminal Orchestrator uses three predefined tiers as a classification system. Tiers are metadata labels that help administrators categorize policies; enforcement comes from the policy content, not the tier label.
 
 ### restricted
 
@@ -160,7 +160,7 @@ Typical characteristics:
 
 ## Assignment Precedence
 
-Policies are assigned at four levels. When resolving the effective policy for a user, ShellGuard checks each level in order and uses the first match:
+Policies are assigned at four levels. When resolving the effective policy for a user, Open Terminal Orchestrator checks each level in order and uses the first match:
 
 ```
 1. User-level override      (highest priority)
@@ -171,11 +171,11 @@ Policies are assigned at four levels. When resolving the effective policy for a 
 
 **User-level override** -- An explicit policy assigned directly to one user. Use this for exceptions (e.g., granting a specific user elevated access temporarily).
 
-**Group-level assignment** -- A policy assigned to a ShellGuard group. Users in that group inherit the policy. This is the primary mechanism for managing policies in multi-user deployments.
+**Group-level assignment** -- A policy assigned to a Open Terminal Orchestrator group. Users in that group inherit the policy. This is the primary mechanism for managing policies in multi-user deployments.
 
 **Role-level default** -- A policy mapped to an Open WebUI role (`admin`, `user`, `pending`). All users with that role get this policy unless overridden at the group or user level.
 
-**System default** -- The fallback policy configured in ShellGuard system settings. Applied when no other assignment matches.
+**System default** -- The fallback policy configured in Open Terminal Orchestrator system settings. Applied when no other assignment matches.
 
 ### Viewing Effective Policy
 

@@ -8,12 +8,12 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in ShellGuard, please report it responsibly.
+If you discover a security vulnerability in Open Terminal Orchestrator, please report it responsibly.
 
 ### How to Report
 
 1. **Do not** open a public GitHub issue for security vulnerabilities.
-2. Email your report to **security@shellguard.dev** with:
+2. Email your report to **security@openterminalorchestrator.dev** with:
    - A description of the vulnerability
    - Steps to reproduce
    - Potential impact assessment
@@ -47,7 +47,7 @@ The following are in scope for security reports:
 
 ## Security Best Practices for Operators
 
-- Always deploy ShellGuard behind a TLS-terminating reverse proxy.
+- Always deploy Open Terminal Orchestrator behind a TLS-terminating reverse proxy.
 - Rotate `ADMIN_API_KEY` and `OPEN_WEBUI_API_KEY` regularly.
 - Enable Row-Level Security (RLS) on all Supabase tables (enabled by default).
 - Restrict network access to the management API to trusted networks.

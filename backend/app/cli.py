@@ -1,4 +1,4 @@
-"""ShellGuard CLI — policy CRUD, sandbox diagnostics, and user sync."""
+"""Open Terminal Orchestrator CLI — policy CRUD, sandbox diagnostics, and user sync."""
 
 from __future__ import annotations
 
@@ -13,13 +13,13 @@ import httpx
 
 
 def get_base_url() -> str:
-    return os.environ.get("SHELLGUARD_URL", "http://localhost:8080")
+    return os.environ.get("OTO_URL", "http://localhost:8080")
 
 
 def get_api_key() -> str:
-    key = os.environ.get("SHELLGUARD_API_KEY", "")
+    key = os.environ.get("OTO_API_KEY", "")
     if not key:
-        print("Error: SHELLGUARD_API_KEY environment variable is required", file=sys.stderr)
+        print("Error: OTO_API_KEY environment variable is required", file=sys.stderr)
         sys.exit(1)
     return key
 
@@ -230,8 +230,8 @@ def cmd_user_list(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="shellguard-cli",
-        description="ShellGuard CLI — manage policies, sandboxes, and users",
+        prog="oto-cli",
+        description="Open Terminal Orchestrator CLI — manage policies, sandboxes, and users",
     )
     parser.add_argument(
         "--format",

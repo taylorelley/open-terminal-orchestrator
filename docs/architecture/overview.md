@@ -1,10 +1,10 @@
-# ShellGuard Architecture
+# Open Terminal Orchestrator Architecture
 
-This document describes the system architecture of ShellGuard, the secure terminal orchestration layer for Open WebUI.
+This document describes the system architecture of Open Terminal Orchestrator, the secure terminal orchestration layer for Open WebUI.
 
 ## Overview
 
-ShellGuard sits between Open WebUI and OpenShell, providing policy-enforced, per-user sandbox isolation. It consists of a FastAPI backend, a React admin UI, a PostgreSQL state store, and integration with the OpenShell sandbox runtime.
+Open Terminal Orchestrator sits between Open WebUI and OpenShell, providing policy-enforced, per-user sandbox isolation. It consists of a FastAPI backend, a React admin UI, a PostgreSQL state store, and integration with the OpenShell sandbox runtime.
 
 ## High-Level Component Diagram
 
@@ -12,14 +12,14 @@ ShellGuard sits between Open WebUI and OpenShell, providing policy-enforced, per
 +-----------------------------------------------------------------+
 |                         Open WebUI                              |
 |          (System-level Terminal integration)                     |
-|          Configured endpoint: http://shellguard:8080            |
+|          Configured endpoint: http://oto:8080            |
 +-----------------------------+-----------------------------------+
                               |
            REST API calls with X-Open-WebUI-User-Id header
                               |
                               v
 +-----------------------------------------------------------------+
-|                   ShellGuard Orchestrator                        |
+|                   Open Terminal Orchestrator Orchestrator                        |
 |                     (FastAPI + Python)                           |
 |                                                                 |
 |  +----------+  +--------------+  +------------+  +------------+ |
@@ -34,7 +34,7 @@ ShellGuard sits between Open WebUI and OpenShell, providing policy-enforced, per
 |                                                                 |
 |  +------------------------------------------------------------+ |
 |  |            Management Web UI (React/TypeScript)             | |
-|  |            Served at: http://shellguard:8080/admin          | |
+|  |            Served at: http://oto:8080/admin          | |
 |  +------------------------------------------------------------+ |
 +-----------------------------------------------------------------+
                               |
@@ -96,7 +96,7 @@ React/TypeScript SPA served at `/admin` on the orchestrator. Provides dashboard,
 ### Proxy Flow: Open WebUI to Sandbox
 
 ```
-Open WebUI           ShellGuard Proxy         Pool Manager         OpenShell           Sandbox
+Open WebUI           Open Terminal Orchestrator Proxy         Pool Manager         OpenShell           Sandbox
     |                      |                       |                    |                  |
     |  POST /api/execute   |                       |                    |                  |
     |  X-Open-WebUI-User-Id: alice                 |                    |                  |
@@ -138,7 +138,7 @@ Open WebUI           ShellGuard Proxy         Pool Manager         OpenShell    
 ### Admin UI Flow
 
 ```
-Admin Browser          ShellGuard Backend         PostgreSQL
+Admin Browser          Open Terminal Orchestrator Backend         PostgreSQL
     |                        |                        |
     |  GET /admin            |                        |
     |  (serves React SPA)    |                        |

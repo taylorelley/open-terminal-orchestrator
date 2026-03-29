@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: shellguard
+  name: oto
   labels:
-    app.kubernetes.io/name: shellguard
-    app.kubernetes.io/part-of: shellguard
+    app.kubernetes.io/name: oto
+    app.kubernetes.io/part-of: oto

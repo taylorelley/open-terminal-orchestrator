@@ -71,9 +71,9 @@ class OIDCClient:
         # Derive a deterministic secret from client_secret so it survives restarts.
         if settings.oidc_client_secret:
             return hashlib.sha256(
-                f"shellguard-session:{settings.oidc_client_secret}".encode()
+                f"oto-session:{settings.oidc_client_secret}".encode()
             ).hexdigest()
-        return "shellguard-dev-secret"
+        return "oto-dev-secret"
 
     # ------------------------------------------------------------------
     # Discovery
@@ -220,17 +220,17 @@ class OIDCClient:
             "groups": user_info.groups,
             "iat": now,
             "exp": now + SESSION_LIFETIME,
-            "iss": "shellguard",
+            "iss": "oto",
         }
         header = {"alg": "HS256"}
         return jwt.encode(header, payload, self._session_secret).decode("utf-8")
 
     def verify_session_token(self, token: str) -> OIDCUserInfo | None:
-        """Verify a ShellGuard session JWT. Returns None if invalid."""
+        """Verify an Open Terminal Orchestrator session JWT. Returns None if invalid."""
         try:
             claims = jwt.decode(token, self._session_secret)
             claims.validate()
-            if claims.get("iss") != "shellguard":
+            if claims.get("iss") != "oto":
                 return None
             return OIDCUserInfo(
                 sub=claims["sub"],

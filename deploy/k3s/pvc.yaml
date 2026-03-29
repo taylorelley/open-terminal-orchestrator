@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: shellguard-db-data
-  namespace: shellguard
+  name: oto-db-data
+  namespace: oto
   labels:
-    app.kubernetes.io/name: shellguard
+    app.kubernetes.io/name: oto
     app.kubernetes.io/component: database
 spec:
   accessModes:
@@ -16,10 +16,10 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: shellguard-user-data
-  namespace: shellguard
+  name: oto-user-data
+  namespace: oto
   labels:
-    app.kubernetes.io/name: shellguard
+    app.kubernetes.io/name: oto
     app.kubernetes.io/component: storage
 spec:
   accessModes:

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 vi.mock('../../lib/supabase', () => {
   const configData = [
-    { key: 'general', value: { instance_name: 'ShellGuard Production', base_url: 'http://shellguard:8080', openshell_gateway: '', owui_endpoint: '', byoc_image: '' } },
+    { key: 'general', value: { instance_name: 'OTO Production', base_url: 'http://oto:8080', openshell_gateway: '', owui_endpoint: '', byoc_image: '' } },
     { key: 'pool', value: { warmup_size: 2, max_sandboxes: 20, max_active: 10 } },
     { key: 'lifecycle', value: { idle_timeout: '30m', suspend_timeout: '24h', startup_timeout: '120s', resume_timeout: '30s' } },
     { key: 'auth', value: { method: 'local', oidc_issuer: '', oidc_client_id: '', oidc_client_secret: '', oidc_redirect_uri: '' } },

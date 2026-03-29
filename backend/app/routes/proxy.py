@@ -1,7 +1,7 @@
 """Open Terminal-compatible proxy API.
 
 These endpoints mirror the full Open Terminal REST API surface so that Open
-WebUI can connect to ShellGuard as if it were a single Open Terminal instance.
+WebUI can connect to Open Terminal Orchestrator as if it were a single Open Terminal instance.
 Each request is routed to the calling user's assigned sandbox.
 """
 
