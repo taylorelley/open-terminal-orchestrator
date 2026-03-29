@@ -303,13 +303,18 @@ See [`.env.example`](.env.example) for additional options.
 
 ## Documentation
 
-- [Architecture Overview](docs/architecture.md)
-- [Policy Guide](docs/policy-guide.md)
-- [Deployment Guide](docs/deployment.md)
-- [API Reference](docs/api-reference.md)
-- [TLS & Reverse Proxy Setup](docs/tls-reverse-proxy.md)
-- [Operational Runbook](docs/runbook.md)
-- [Security Review](docs/security-review.md)
+Full documentation is available in the [docs/](docs/README.md) directory:
+
+- **[Getting Started](docs/user-guide/getting-started.md)** — Installation and first-time setup
+- **[Dashboard Overview](docs/user-guide/dashboard-overview.md)** — Navigating the admin UI
+- **[Deployment](docs/admin-guide/deployment.md)** — Production deployment guides
+- **[Configuration](docs/admin-guide/configuration-reference.md)** — All environment variables and settings
+- **[API Reference](docs/architecture/api-reference.md)** — Proxy and management API endpoints
+- **[Architecture](docs/architecture/overview.md)** — System design and component diagrams
+- **[Policy Guide](docs/user-guide/managing-policies.md)** — Writing and assigning security policies
+- **[Runbook](docs/operations/runbook.md)** | **[Troubleshooting](docs/operations/troubleshooting.md)** — Operations
+- **[Security Review](docs/architecture/security-review.md)** — Threat model and compliance
+- **[Developer Guide](docs/developer-guide/setup.md)** — Contributing and extending ShellGuard
 
 ## Security
 

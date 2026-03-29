@@ -126,7 +126,7 @@ inference:
 
 These rules are enforced at the sandbox's network policy layer (L7 filtering). Traffic matching a route is redirected to the specified backend. Traffic to inference APIs not listed in the policy is blocked by the network `default: deny` rule.
 
-See the [Policy Authoring Guide](policy-guide.md) for full syntax and examples.
+See the [Policy Authoring Guide](../user-guide/managing-policies.md) for full syntax and examples.
 
 ## How Policies Control Model Access by Tier
 

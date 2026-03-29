@@ -10,6 +10,7 @@ import {
   Terminal,
   ChevronLeft,
   ChevronRight,
+  BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -63,6 +64,18 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      <div className="px-2 pb-2">
+        <a
+          href="/docs/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 ${collapsed ? 'justify-center' : ''}`}
+        >
+          <BookOpen className="w-[18px] h-[18px] flex-shrink-0" />
+          {!collapsed && <span className="truncate">Documentation</span>}
+        </a>
+      </div>
 
       <button
         onClick={() => setCollapsed(!collapsed)}

@@ -1,0 +1,121 @@
+site_name: ShellGuard Documentation
+site_description: Secure terminal orchestration for Open WebUI — admin guide, user guide, and developer reference.
+site_url: https://taylorelley.github.io/shellguard/
+repo_url: https://github.com/taylorelley/shellguard
+repo_name: taylorelley/shellguard
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/shield-lock
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/taylorelley/shellguard
+  generator: false
+
+copyright: Copyright &copy; 2026 ShellGuard Contributors
+
+nav:
+  - Home: README.md
+  - User Guide:
+      - Getting Started: user-guide/getting-started.md
+      - Dashboard Overview: user-guide/dashboard-overview.md
+      - Managing Sandboxes: user-guide/managing-sandboxes.md
+      - Managing Policies: user-guide/managing-policies.md
+      - Managing Users & Groups: user-guide/managing-users-groups.md
+  - Admin Guide:
+      - Deployment: admin-guide/deployment.md
+      - Configuration Reference: admin-guide/configuration-reference.md
+      - Authentication: admin-guide/authentication.md
+      - TLS & Reverse Proxy: admin-guide/tls-reverse-proxy.md
+      - Inference Routing: admin-guide/inference-routing.md
+      - Monitoring & Alerting: admin-guide/monitoring-alerting.md
+      - Backup & Restore: admin-guide/backup-restore.md
+  - Operations:
+      - Runbook: operations/runbook.md
+      - Troubleshooting: operations/troubleshooting.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - API Reference: architecture/api-reference.md
+      - Security Review: architecture/security-review.md
+  - Developer Guide:
+      - Setup: developer-guide/setup.md
+      - Frontend Guide: developer-guide/frontend-guide.md
+      - Backend Guide: developer-guide/backend-guide.md
+      - Testing: developer-guide/testing.md
+      - Database Migrations: developer-guide/database-migrations.md
+  - Releases:
+      - Changelog: releases/changelog.md
