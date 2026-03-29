@@ -7,26 +7,23 @@ Welcome to the ShellGuard documentation. ShellGuard is an open-source orchestrat
 ## Quick Links
 
 - [Getting Started](user-guide/getting-started.md) -- Set up ShellGuard in under 10 minutes
-- [Dashboard Overview](user-guide/dashboard-overview.md) -- Navigate the admin interface
-- [Managing Sandboxes](user-guide/managing-sandboxes.md) -- Lifecycle, pooling, and operations
-- [Policy Engine Reference](architecture/policy-engine.md) -- YAML policy tiers and enforcement
-- [API Reference](architecture/api-reference.md) -- Backend REST API documentation
+- [Configuration Reference](admin-guide/configuration-reference.md) -- All environment variables and settings
+- [API Reference](architecture/api-reference.md) -- Proxy and management API endpoints
+- [Troubleshooting](operations/troubleshooting.md) -- Diagnose and resolve common issues
 
 ---
 
 ## For Operators
 
-Day-to-day guides for administrators and operators who manage ShellGuard through the dashboard.
+Day-to-day guides for operators who manage ShellGuard through the admin dashboard.
 
 | Document | Description |
 |----------|-------------|
 | [Getting Started](user-guide/getting-started.md) | Prerequisites, installation, and first login |
 | [Dashboard Overview](user-guide/dashboard-overview.md) | Navigation, pages, and key metrics |
 | [Managing Sandboxes](user-guide/managing-sandboxes.md) | Sandbox lifecycle, actions, pooling, and metrics |
-| [Managing Users & Groups](user-guide/managing-users-groups.md) | User sync, groups, and policy assignment |
 | [Managing Policies](user-guide/managing-policies.md) | Creating, editing, and assigning YAML policies |
-| [Audit Log](user-guide/audit-log.md) | Searching, filtering, and exporting audit events |
-| [Monitoring & Alerts](user-guide/monitoring-alerts.md) | Resource charts, alert rules, and webhooks |
+| [Managing Users & Groups](user-guide/managing-users-groups.md) | User sync, groups, and policy assignment |
 
 ## For Administrators
 
@@ -34,56 +31,86 @@ Deployment, configuration, and platform administration guides.
 
 | Document | Description |
 |----------|-------------|
-| [Deployment Guide](admin-guide/deployment.md) | Production deployment with Docker Compose and Kubernetes |
-| [Configuration Reference](admin-guide/configuration.md) | All environment variables and system settings |
-| [Authentication & OIDC](admin-guide/authentication.md) | OIDC provider setup, Supabase Auth, and session management |
-| [Database Administration](admin-guide/database.md) | PostgreSQL schema, migrations, backups, and RLS policies |
-| [Security Hardening](admin-guide/security.md) | Network isolation, TLS, secret management, and best practices |
-| [Upgrading](admin-guide/upgrading.md) | Version upgrade procedures and migration notes |
+| [Deployment](admin-guide/deployment.md) | Production deployment with Docker Compose and Kubernetes |
+| [Configuration Reference](admin-guide/configuration-reference.md) | All environment variables and system settings |
+| [Authentication](admin-guide/authentication.md) | OIDC/SSO setup, local auth, and API key management |
+| [TLS & Reverse Proxy](admin-guide/tls-reverse-proxy.md) | TLS termination and reverse proxy configuration |
+| [Inference Routing](admin-guide/inference-routing.md) | LiteLLM integration and model provider routing |
+| [Monitoring & Alerting](admin-guide/monitoring-alerting.md) | Prometheus, Grafana, OpenTelemetry, webhooks, syslog |
+| [Backup & Restore](admin-guide/backup-restore.md) | Database backup strategies and disaster recovery |
 
 ## Operations
 
-Runbooks and operational procedures for production environments.
+Runbooks and procedures for production environments.
 
 | Document | Description |
 |----------|-------------|
-| [Runbooks](operations/runbooks.md) | Step-by-step procedures for common operational tasks |
+| [Runbook](operations/runbook.md) | Step-by-step procedures for common operational tasks |
 | [Troubleshooting](operations/troubleshooting.md) | Diagnosing and resolving common issues |
-| [Backup & Recovery](operations/backup-recovery.md) | Database backup strategies and disaster recovery |
-| [Scaling](operations/scaling.md) | Horizontal scaling, pool sizing, and resource planning |
-| [Observability](operations/observability.md) | Logging, metrics export, and integration with monitoring stacks |
 
 ## Architecture & Reference
 
-Technical architecture, API documentation, and design decisions.
+Technical architecture, API documentation, and security review.
 
 | Document | Description |
 |----------|-------------|
 | [Architecture Overview](architecture/overview.md) | System components, data flow, and design principles |
-| [Policy Engine](architecture/policy-engine.md) | YAML policy schema, tiers, resolution, and enforcement |
-| [Sandbox Lifecycle](architecture/sandbox-lifecycle.md) | State machine, pooling strategy, and container management |
-| [API Reference](architecture/api-reference.md) | Backend REST API endpoints, request/response schemas |
-| [Database Schema](architecture/database-schema.md) | Tables, relationships, indexes, and RLS policies |
-| [LiteLLM Integration](architecture/litellm-integration.md) | Inference routing and model provider configuration |
+| [API Reference](architecture/api-reference.md) | Proxy and management API endpoints with request/response schemas |
+| [Security Review](architecture/security-review.md) | Threat model, compliance, and security architecture |
 
 ## For Developers
 
-Guides for contributors and developers extending ShellGuard.
+Guides for contributors extending ShellGuard.
 
 | Document | Description |
 |----------|-------------|
-| [Development Setup](developer-guide/development-setup.md) | Local environment, tooling, and dev workflow |
-| [Frontend Architecture](developer-guide/frontend.md) | React app structure, components, hooks, and conventions |
-| [Backend Architecture](developer-guide/backend.md) | FastAPI app structure, services, and middleware |
+| [Development Setup](developer-guide/setup.md) | Local environment, tooling, and dev workflow |
+| [Frontend Guide](developer-guide/frontend-guide.md) | React app structure, adding pages, components, and hooks |
+| [Backend Guide](developer-guide/backend-guide.md) | FastAPI routes, services, models, and configuration |
 | [Testing](developer-guide/testing.md) | Running tests, writing tests, and CI pipeline |
-| [Contributing](developer-guide/contributing.md) | Code style, PR process, and community guidelines |
+| [Database Migrations](developer-guide/database-migrations.md) | Supabase migration workflow, RLS patterns |
 
 ## Releases
 
 | Document | Description |
 |----------|-------------|
 | [Changelog](releases/changelog.md) | Version history and release notes |
-| [Roadmap](releases/roadmap.md) | Planned features and milestones |
+
+---
+
+## Building the Documentation Site
+
+The documentation can be built as a static site using [MkDocs](https://www.mkdocs.org/) with the [Material for MkDocs](https://squidfunnel.github.io/mkdocs-material/) theme.
+
+### Prerequisites
+
+```bash
+pip install -r docs/requirements.txt
+```
+
+### Local Preview
+
+```bash
+mkdocs serve
+```
+
+This starts a local server at `http://localhost:8000` with live reload.
+
+### Build Static Site
+
+```bash
+mkdocs build
+```
+
+The static site is generated in the `site/` directory, ready for deployment to any static hosting provider (GitHub Pages, Netlify, Cloudflare Pages, etc.).
+
+### Deploy to GitHub Pages
+
+```bash
+mkdocs gh-deploy
+```
+
+This builds and pushes the site to the `gh-pages` branch automatically.
 
 ---
 
