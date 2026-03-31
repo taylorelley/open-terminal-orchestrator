@@ -46,6 +46,7 @@ vi.mock('../../lib/supabase', () => {
   }
 
   return {
+    isLocalMode: false,
     supabase: {
       from: vi.fn((table: string) => makeChain(tableData[table] ?? [])),
       channel: vi.fn(() => ({ on: vi.fn().mockReturnThis(), subscribe: vi.fn(), unsubscribe: vi.fn() })),
