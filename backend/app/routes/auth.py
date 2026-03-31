@@ -279,27 +279,31 @@ async def local_signup(request: Request, db: AsyncSession = Depends(get_db)) -> 
     if not email or not password:
         return JSONResponse({"error": "Email and password are required"}, status_code=400)
 
-    # Only allow signup when no admin users exist.
-    existing = (await db.execute(select(AdminUser).limit(1))).scalars().first()
-    if existing is not None:
-        return JSONResponse(
-            {"error": "An admin user already exists. Use login instead."}, status_code=409
+    try:
+        # Only allow signup when no admin users exist.
+        existing = (await db.execute(select(AdminUser).limit(1))).scalars().first()
+        if existing is not None:
+            return JSONResponse(
+                {"error": "An admin user already exists. Use login instead."}, status_code=409
+            )
+
+        user = AdminUser(
+            id=uuid.uuid4(),
+            email=email,
+            password_hash=_hash_password(password),
+            created_at=datetime.now(timezone.utc),
         )
+        db.add(user)
+        await db.flush()
 
-    user = AdminUser(
-        id=uuid.uuid4(),
-        email=email,
-        password_hash=_hash_password(password),
-        created_at=datetime.now(timezone.utc),
-    )
-    db.add(user)
-    await db.flush()
+        ip = _source_ip(request)
+        log_admin(db, "local_signup", details={"email": email}, source_ip=ip)
 
-    ip = _source_ip(request)
-    log_admin(db, "local_signup", details={"email": email}, source_ip=ip)
-
-    token = _create_local_token(str(user.id), email)
-    return JSONResponse({"token": token, "user": {"id": str(user.id), "email": email}})
+        token = _create_local_token(str(user.id), email)
+        return JSONResponse({"token": token, "user": {"id": str(user.id), "email": email}})
+    except Exception:
+        logger.exception("local_signup failed for %s", email)
+        return JSONResponse({"error": "Signup failed. Check server logs for details."}, status_code=500)
 
 
 @router.post("/local/login")

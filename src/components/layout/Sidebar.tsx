@@ -15,13 +15,13 @@ import {
 import { useState } from 'react';
 
 const navItems = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/sandboxes', icon: Container, label: 'Sandboxes' },
-  { to: '/admin/policies', icon: Shield, label: 'Policies' },
-  { to: '/admin/users', icon: Users, label: 'Users & Groups' },
-  { to: '/admin/audit', icon: FileText, label: 'Audit Log' },
-  { to: '/admin/monitoring', icon: Activity, label: 'Monitoring' },
-  { to: '/admin/settings', icon: Settings, label: 'Settings' },
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/sandboxes', icon: Container, label: 'Sandboxes' },
+  { to: '/policies', icon: Shield, label: 'Policies' },
+  { to: '/users', icon: Users, label: 'Users & Groups' },
+  { to: '/audit', icon: FileText, label: 'Audit Log' },
+  { to: '/monitoring', icon: Activity, label: 'Monitoring' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export function Sidebar() {
