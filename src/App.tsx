@@ -51,16 +51,15 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/admin" replace /> : <Login />} />
-      <Route path="/admin/*" element={<ProtectedRoutes />} />
-      <Route path="*" element={<Navigate to="/admin" replace />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/*" element={<ProtectedRoutes />} />
     </Routes>
   );
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/admin">
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
