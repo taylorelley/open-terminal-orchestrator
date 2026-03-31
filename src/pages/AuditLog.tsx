@@ -12,7 +12,7 @@ import {
   Trash2,
   Plus,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import * as ds from '../lib/dataService';
 import { useSupabaseRealtime } from '../hooks/useSupabaseQuery';
 import { useFilterPresets } from '../hooks/useFilterPresets';
 import { Tabs } from '../components/ui/Tabs';
@@ -59,15 +59,8 @@ export default function AuditLog() {
     setLoading(true);
     const since = new Date(Date.now() - DATE_PRESETS[datePreset].ms).toISOString();
 
-    const { data } = await supabase
-      .from('audit_log')
-      .select('*, user:users(*), sandbox:sandboxes(*)')
-      .eq('category', activeTab)
-      .gte('timestamp', since)
-      .order('timestamp', { ascending: false })
-      .limit(200);
-
-    setEntries((data || []) as AuditLogEntry[]);
+    const result = await ds.getAuditLog({ category: activeTab, since, limit: 200 });
+    setEntries(result.data?.items || []);
     setLoading(false);
   }, [activeTab, datePreset]);
 
@@ -76,19 +69,13 @@ export default function AuditLog() {
     const categories: AuditCategory[] = ['enforcement', 'lifecycle', 'admin'];
 
     const results = await Promise.all(
-      categories.map((cat) =>
-        supabase
-          .from('audit_log')
-          .select('id', { count: 'exact', head: true })
-          .eq('category', cat)
-          .gte('timestamp', since)
-      )
+      categories.map((cat) => ds.getAuditLogCount(cat, since))
     );
 
     setCounts({
-      enforcement: results[0].count || 0,
-      lifecycle: results[1].count || 0,
-      admin: results[2].count || 0,
+      enforcement: results[0].data || 0,
+      lifecycle: results[1].data || 0,
+      admin: results[2].data || 0,
     });
   }, [datePreset]);
 

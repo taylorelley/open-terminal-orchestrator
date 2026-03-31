@@ -10,7 +10,7 @@ Variables marked **required** must be set for Open Terminal Orchestrator to star
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DATABASE_URL` | string | *(required)* | PostgreSQL connection string. Format: `postgresql://user:password@host:port/dbname`. Must point to a PostgreSQL 14+ instance. |
+| `DATABASE_URL` | string | *(required)* | Database connection string. For PostgreSQL: `postgresql://user:password@host:port/dbname` (PostgreSQL 14+). For local/dev SQLite: `sqlite:///./oto.db`. When using SQLite, tables are auto-created on first startup (no migrations needed). |
 | `SG_DB_PASS` | string | `oto` | Database password. Used by the Docker Compose stack to initialize the PostgreSQL container and injected into `DATABASE_URL` automatically when using the provided `docker-compose.yml`. |
 
 ---
@@ -32,8 +32,8 @@ These variables are embedded into the frontend bundle at build time by Vite. The
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `VITE_SUPABASE_URL` | string | *(required for frontend)* | The Supabase project URL. Used by the React frontend to initialize the Supabase client for authentication and real-time subscriptions. |
-| `VITE_SUPABASE_ANON_KEY` | string | *(required for frontend)* | The Supabase anonymous (public) key. This key is safe to expose in the browser -- Row-Level Security policies on the database enforce access control. |
+| `VITE_SUPABASE_URL` | string | *(optional)* | The Supabase project URL. Used by the React frontend to initialize the Supabase client for authentication and real-time subscriptions. **When omitted**, the frontend enters "local mode" and routes all data through the backend REST API using local JWT auth. |
+| `VITE_SUPABASE_ANON_KEY` | string | *(optional)* | The Supabase anonymous (public) key. Required when `VITE_SUPABASE_URL` is set. This key is safe to expose in the browser -- Row-Level Security policies on the database enforce access control. |
 
 ---
 

@@ -1,23 +1,24 @@
 """SQLAlchemy ORM models mapped to the existing Supabase schema.
 
 Schema is defined in: supabase/migrations/20260326203442_create_oto_schema.sql
-These models are read/write adapters only — never call Base.metadata.create_all().
+When running against PostgreSQL the schema is managed by Supabase migrations.
+When running against SQLite the tables are auto-created via ``init_db()``.
 """
 
 import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.compat import GUID, PortableJSON
 
 
 class Policy(Base):
     __tablename__ = "policies"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     tier: Mapped[str] = mapped_column(Text, nullable=False, default="restricted")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -32,13 +33,13 @@ class Policy(Base):
 class PolicyVersion(Base):
     __tablename__ = "policy_versions"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    policy_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("policies.id", ondelete="CASCADE"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    policy_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("policies.id", ondelete="CASCADE"), nullable=False)
     version: Mapped[str] = mapped_column(Text, nullable=False)
     yaml: Mapped[str] = mapped_column(Text, nullable=False, default="")
     changelog: Mapped[str] = mapped_column(Text, nullable=False, default="")
     # References auth.users in Supabase — plain column here, no FK relationship.
-    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     policy: Mapped["Policy"] = relationship(back_populates="versions", lazy="selectin")
@@ -47,10 +48,10 @@ class PolicyVersion(Base):
 class Group(Base):
     __tablename__ = "groups"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    policy_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("policies.id", ondelete="SET NULL"), nullable=True)
+    policy_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("policies.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -61,12 +62,12 @@ class Group(Base):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     owui_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     username: Mapped[str] = mapped_column(Text, nullable=False)
     email: Mapped[str] = mapped_column(Text, nullable=False, default="")
     owui_role: Mapped[str] = mapped_column(Text, nullable=False, default="user")
-    group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
+    group_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     group: Mapped["Group | None"] = relationship(back_populates="members", lazy="selectin")
@@ -75,11 +76,11 @@ class User(Base):
 class Sandbox(Base):
     __tablename__ = "sandboxes"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     state: Mapped[str] = mapped_column(Text, nullable=False, default="POOL")
-    policy_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("policies.id", ondelete="SET NULL"), nullable=True)
+    policy_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("policies.id", ondelete="SET NULL"), nullable=True)
     internal_ip: Mapped[str] = mapped_column(Text, nullable=False, default="")
     image_tag: Mapped[str] = mapped_column(Text, nullable=False, default="oto-sandbox:slim")
     data_dir: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -102,13 +103,13 @@ class Sandbox(Base):
 class PolicyAssignment(Base):
     __tablename__ = "policy_assignments"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     entity_type: Mapped[str] = mapped_column(Text, nullable=False)
     entity_id: Mapped[str] = mapped_column(Text, nullable=False)
-    policy_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("policies.id", ondelete="CASCADE"), nullable=False)
+    policy_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("policies.id", ondelete="CASCADE"), nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # References auth.users in Supabase — plain column here, no FK relationship.
-    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     policy: Mapped["Policy"] = relationship(lazy="selectin")
@@ -117,13 +118,13 @@ class PolicyAssignment(Base):
 class AuditLogEntry(Base):
     __tablename__ = "audit_log"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     event_type: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(Text, nullable=False)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    sandbox_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("sandboxes.id", ondelete="SET NULL"), nullable=True)
-    details: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    sandbox_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("sandboxes.id", ondelete="SET NULL"), nullable=True)
+    details: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     source_ip: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
     user: Mapped["User | None"] = relationship(lazy="selectin")
@@ -133,18 +134,29 @@ class AuditLogEntry(Base):
 class MetricSnapshot(Base):
     __tablename__ = "metric_snapshots"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     metric_type: Mapped[str] = mapped_column(Text, nullable=False)
     value: Mapped[float] = mapped_column(Float, nullable=False, default=0)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    metadata_: Mapped[dict] = mapped_column("metadata", PortableJSON, nullable=False, default=dict)
 
 
 class SystemConfig(Base):
     __tablename__ = "system_config"
 
     key: Mapped[str] = mapped_column(String, primary_key=True)
-    value: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    value: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # References auth.users in Supabase — plain column here, no FK relationship.
-    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+
+
+class AdminUser(Base):
+    """Local admin user for SQLite/non-Supabase authentication."""
+
+    __tablename__ = "admin_users"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

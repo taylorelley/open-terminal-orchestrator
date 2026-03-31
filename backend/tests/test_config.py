@@ -15,8 +15,12 @@ class TestConvertDatabaseUrl:
         result = Settings.convert_database_url(url)
         assert result == url
 
-    def test_other_url_unchanged(self):
-        url = "sqlite:///test.db"
+    def test_sqlite_converted_to_aiosqlite(self):
+        result = Settings.convert_database_url("sqlite:///test.db")
+        assert result == "sqlite+aiosqlite:///test.db"
+
+    def test_aiosqlite_url_unchanged(self):
+        url = "sqlite+aiosqlite:///test.db"
         result = Settings.convert_database_url(url)
         assert result == url
 

@@ -8,7 +8,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { supabase } from '../lib/supabase';
+import { getDashboardData } from '../lib/dataService';
 import { StatCard } from '../components/ui/StatCard';
 import { Badge } from '../components/ui/Badge';
 import { LoadingState } from '../components/ui/EmptyState';
@@ -33,38 +33,23 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    const [sandboxRes, auditRes, configRes, lifecycleRes] = await Promise.all([
-      supabase.from('sandboxes').select('*, user:users(*), policy:policies(*)').neq('state', 'DESTROYED'),
-      supabase
-        .from('audit_log')
-        .select('*, user:users(*)')
-        .order('timestamp', { ascending: false })
-        .limit(20),
-      supabase.from('system_config').select('*').in('key', ['pool', 'lifecycle']),
-      supabase
-        .from('audit_log')
-        .select('details')
-        .eq('category', 'lifecycle')
-        .eq('event_type', 'created')
-        .gte('timestamp', new Date(Date.now() - 3600000).toISOString()),
-    ]);
+    const { sandboxes: allSandboxes, recentEvents: allEvents, config: configData, lifecycleEvents } = await getDashboardData();
 
-    const allSandboxes = (sandboxRes.data || []) as Sandbox[];
     const activeSandboxes = allSandboxes.filter((s) => ['ACTIVE', 'READY'].includes(s.state));
     const suspendedSandboxes = allSandboxes.filter((s) => s.state === 'SUSPENDED');
     const poolSandboxes = allSandboxes.filter((s) => ['POOL', 'WARMING'].includes(s.state) && !s.user_id);
 
-    const poolConfig = (configRes.data || []).find((c) => c.key === 'pool');
+    const poolConfig = configData.find((c) => c.key === 'pool');
     const maxActive = poolConfig?.value?.max_active as number || 10;
     const poolTarget = poolConfig?.value?.warmup_size as number || 2;
 
-    const allEvents = (auditRes.data || []) as AuditLogEntry[];
     const enforcementEvents = allEvents.filter((e) => e.category === 'enforcement');
     const last24h = enforcementEvents.filter(
       (e) => new Date(e.timestamp).getTime() > Date.now() - 86400000
     );
 
-    const startupTimes = ((lifecycleRes.data || []) as { details: Record<string, unknown> }[])
+    const startupTimes = (lifecycleEvents as { details: Record<string, unknown> }[])
+      .filter((e) => (e.details as Record<string, unknown>)?.event_type === 'created')
       .map((e) => (e.details?.warmup_time_ms as number) || 0)
       .filter((t) => t > 0);
     const avgStartup = startupTimes.length > 0

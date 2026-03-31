@@ -10,10 +10,9 @@ import {
   Check,
   Archive,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import * as ds from '../lib/dataService';
 import { Tabs } from '../components/ui/Tabs';
 import { LoadingState } from '../components/ui/EmptyState';
-import type { SystemConfig } from '../types';
 
 interface ConfigState {
   general: {
@@ -70,10 +69,10 @@ export default function Settings() {
   const [backingUp, setBackingUp] = useState(false);
 
   const fetchConfig = useCallback(async () => {
-    const { data } = await supabase.from('system_config').select('*');
-    if (data) {
+    const result = await ds.getSystemConfig();
+    if (result.data) {
       const configMap: Record<string, unknown> = {};
-      (data as SystemConfig[]).forEach((c) => {
+      result.data.forEach((c) => {
         configMap[c.key] = c.value;
       });
       setConfig({
@@ -91,11 +90,7 @@ export default function Settings() {
 
   const handleSave = async (section: string) => {
     setSaving(true);
-    await supabase.from('system_config').upsert({
-      key: section,
-      value: config[section as keyof ConfigState],
-      updated_at: new Date().toISOString(),
-    });
+    await ds.upsertSystemConfig(section, config[section as keyof ConfigState]);
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -113,8 +108,8 @@ export default function Settings() {
   };
 
   const handleExportPolicies = async () => {
-    const { data } = await supabase.from('policies').select('*');
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const result = await ds.getPolicies();
+    const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -517,7 +512,7 @@ export default function Settings() {
                     const data = JSON.parse(text);
                     if (Array.isArray(data)) {
                       for (const policy of data) {
-                        await supabase.from('policies').upsert({
+                        await ds.createPolicy({
                           name: policy.name,
                           tier: policy.tier,
                           description: policy.description,

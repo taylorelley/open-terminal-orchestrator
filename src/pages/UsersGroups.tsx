@@ -8,7 +8,7 @@ import {
   Circle,
   RefreshCw,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import * as ds from '../lib/dataService';
 import { Tabs } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { SlidePanel } from '../components/ui/SlidePanel';
@@ -33,17 +33,17 @@ export default function UsersGroups() {
 
   const fetchData = useCallback(async () => {
     const [usersRes, groupsRes, polRes, sbRes, assignRes] = await Promise.all([
-      supabase.from('users').select('*, group:groups(*, policy:policies(*))').order('username'),
-      supabase.from('groups').select('*, policy:policies(*)').order('name'),
-      supabase.from('policies').select('*').order('name'),
-      supabase.from('sandboxes').select('*').neq('state', 'DESTROYED'),
-      supabase.from('policy_assignments').select('*, policy:policies(*)'),
+      ds.getUsers(),
+      ds.getGroups(),
+      ds.getPolicies(),
+      ds.getSandboxes({ excludeState: 'DESTROYED' }),
+      ds.getPolicyAssignments(),
     ]);
-    setUsers((usersRes.data || []) as User[]);
-    setGroups((groupsRes.data || []) as Group[]);
-    setPolicies((polRes.data || []) as Policy[]);
-    setSandboxes((sbRes.data || []) as Sandbox[]);
-    setAssignments((assignRes.data || []) as PolicyAssignment[]);
+    setUsers(usersRes.data || []);
+    setGroups(groupsRes.data || []);
+    setPolicies(polRes.data || []);
+    setSandboxes(sbRes.data || []);
+    setAssignments(assignRes.data || []);
     setLoading(false);
   }, []);
 
@@ -92,18 +92,18 @@ export default function UsersGroups() {
   const handleSaveGroup = async () => {
     if (!editGroup) return;
     if (editGroup.id) {
-      await supabase.from('groups').update({
+      await ds.updateGroup(editGroup.id, {
         name: editGroup.name,
         description: editGroup.description,
         policy_id: editGroup.policy_id || null,
         updated_at: new Date().toISOString(),
-      }).eq('id', editGroup.id);
+      } as Partial<Group>);
     } else {
-      await supabase.from('groups').insert({
+      await ds.createGroup({
         name: editGroup.name,
         description: editGroup.description,
         policy_id: editGroup.policy_id || null,
-      });
+      } as Partial<Group>);
     }
     setEditGroup(null);
     fetchData();
@@ -111,14 +111,13 @@ export default function UsersGroups() {
 
   const handleDeleteGroup = async () => {
     if (!deleteGroup) return;
-    await supabase.from('users').update({ group_id: null }).eq('group_id', deleteGroup.id);
-    await supabase.from('groups').delete().eq('id', deleteGroup.id);
+    await ds.deleteGroup(deleteGroup.id);
     setDeleteGroup(null);
     fetchData();
   };
 
   const handleUserGroupChange = async (userId: string, groupId: string) => {
-    await supabase.from('users').update({ group_id: groupId || null }).eq('id', userId);
+    await ds.assignUserGroup(userId, groupId || null);
     fetchData();
   };
 
@@ -126,9 +125,9 @@ export default function UsersGroups() {
     const existing = assignments.find((a) => a.entity_type === 'user' && a.entity_id === userId);
     if (policyId) {
       if (existing) {
-        await supabase.from('policy_assignments').update({ policy_id: policyId }).eq('id', existing.id);
+        await ds.upsertPolicyAssignment({ id: existing.id, policy_id: policyId });
       } else {
-        await supabase.from('policy_assignments').insert({
+        await ds.upsertPolicyAssignment({
           entity_type: 'user',
           entity_id: userId,
           policy_id: policyId,
@@ -136,7 +135,7 @@ export default function UsersGroups() {
         });
       }
     } else if (existing) {
-      await supabase.from('policy_assignments').delete().eq('id', existing.id);
+      await ds.deletePolicyAssignment(existing.id);
     }
     fetchData();
   };
@@ -333,9 +332,9 @@ export default function UsersGroups() {
                     onChange={async (e) => {
                       const policyId = e.target.value;
                       if (roleAssign) {
-                        await supabase.from('policy_assignments').update({ policy_id: policyId }).eq('id', roleAssign.id);
+                        await ds.upsertPolicyAssignment({ id: roleAssign.id, policy_id: policyId });
                       } else {
-                        await supabase.from('policy_assignments').insert({
+                        await ds.upsertPolicyAssignment({
                           entity_type: 'role',
                           entity_id: role,
                           policy_id: policyId,

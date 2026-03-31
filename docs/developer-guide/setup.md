@@ -33,6 +33,19 @@ cd open-terminal-orchestrator
 
 ## Database Setup
 
+### Option A: SQLite (quickest for local dev)
+
+No external services required. Set the database URL to SQLite and all tables are auto-created on first backend startup:
+
+```bash
+# In backend/.env
+DATABASE_URL=sqlite:///./oto.db
+```
+
+SQLite mode provides full functionality except for Supabase Realtime subscriptions (which fall back to 30-second polling on the frontend).
+
+### Option B: PostgreSQL via Docker Compose
+
 The easiest way to run PostgreSQL locally is via Docker Compose. The project includes a Compose file with a pre-configured database service.
 
 ```bash
