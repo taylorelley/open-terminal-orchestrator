@@ -8,8 +8,12 @@ to the OpenShell gateway when the CLI is not available.
 import asyncio
 import json
 import logging
+import shutil
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
+
+import httpx
 
 from app.config import settings
 
@@ -17,6 +21,36 @@ logger = logging.getLogger(__name__)
 
 # Default timeout for CLI subprocess calls (seconds).
 _CLI_TIMEOUT = 60
+
+# Detect whether the openshell CLI binary is on PATH.
+_CLI_AVAILABLE = shutil.which("openshell") is not None
+
+# Module-level HTTP client for gateway communication (initialised at startup).
+_gateway_client: httpx.AsyncClient | None = None
+
+
+async def init_gateway_client() -> None:
+    """Create the HTTP client for the OpenShell gateway (when CLI is unavailable)."""
+    global _gateway_client  # noqa: PLW0603
+    if not _CLI_AVAILABLE:
+        _gateway_client = httpx.AsyncClient(
+            base_url=settings.openshell_gateway,
+            timeout=httpx.Timeout(_CLI_TIMEOUT, connect=5.0),
+        )
+        logger.info(
+            "OpenShell gateway HTTP client initialised (base_url=%s)",
+            settings.openshell_gateway,
+        )
+    else:
+        logger.info("OpenShell CLI found on PATH — using subprocess transport")
+
+
+async def close_gateway_client() -> None:
+    """Shut down the gateway HTTP client."""
+    global _gateway_client  # noqa: PLW0603
+    if _gateway_client is not None:
+        await _gateway_client.aclose()
+        _gateway_client = None
 
 
 @dataclass
@@ -35,6 +69,11 @@ class OpenShellError(Exception):
     def __init__(self, message: str, returncode: int = 1) -> None:
         super().__init__(message)
         self.returncode = returncode
+
+
+# ---------------------------------------------------------------------------
+# Transport: CLI subprocess
+# ---------------------------------------------------------------------------
 
 
 async def _run_cli(
@@ -81,6 +120,58 @@ async def _run_cli(
     return stdout_str
 
 
+# ---------------------------------------------------------------------------
+# Transport: HTTP gateway
+# ---------------------------------------------------------------------------
+
+
+async def _gateway_request(
+    method: str,
+    path: str,
+    *,
+    json_body: dict | None = None,
+    body: str | None = None,
+    content_type: str = "application/json",
+    timeout: float = _CLI_TIMEOUT,
+) -> str:
+    """Make an HTTP request to the OpenShell gateway and return the response body.
+
+    Raises:
+        OpenShellError: On HTTP errors or connection failures.
+        asyncio.TimeoutError: On request timeout.
+    """
+    if _gateway_client is None:
+        raise OpenShellError("Gateway client not initialised")
+
+    kwargs: dict = {"timeout": timeout}
+    if json_body is not None:
+        kwargs["json"] = json_body
+    elif body is not None:
+        kwargs["content"] = body
+        kwargs["headers"] = {"Content-Type": content_type}
+
+    try:
+        resp = await _gateway_client.request(method, path, **kwargs)
+    except httpx.ConnectError:
+        raise OpenShellError(
+            f"OpenShell gateway unreachable at {settings.openshell_gateway}"
+        )
+    except httpx.TimeoutException:
+        raise asyncio.TimeoutError()
+
+    if resp.status_code >= 400:
+        raise OpenShellError(
+            resp.text or f"Gateway returned HTTP {resp.status_code}",
+            returncode=1,
+        )
+    return resp.text
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
 def _parse_sandbox_json(raw: str) -> SandboxInfo:
     """Parse JSON output from openshell sandbox commands."""
     try:
@@ -116,22 +207,40 @@ async def create_sandbox(
     if name is None:
         name = f"sg-pool-{uuid.uuid4().hex[:8]}"
 
-    args = [
-        "sandbox", "create",
-        "--name", name,
-        "--from", image_tag,
-        "--output", "json",
-    ]
-    if settings.sandbox_api_key:
-        args.extend(["--env", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
-    if policy_file:
-        args.extend(["--policy", policy_file])
-    if user_data_dir:
-        args.extend(["--volume", f"{user_data_dir}:/data"])
-    if gpu:
-        args.append("--gpu")
+    if _CLI_AVAILABLE:
+        args = [
+            "sandbox", "create",
+            "--name", name,
+            "--from", image_tag,
+            "--output", "json",
+        ]
+        if settings.sandbox_api_key:
+            args.extend(["--env", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
+        if policy_file:
+            args.extend(["--policy", policy_file])
+        if user_data_dir:
+            args.extend(["--volume", f"{user_data_dir}:/data"])
+        if gpu:
+            args.append("--gpu")
+        raw = await _run_cli(*args, timeout=settings.startup_timeout)
+    else:
+        payload: dict = {"name": name, "image": image_tag}
+        env: dict[str, str] = {}
+        if settings.sandbox_api_key:
+            env["OPEN_TERMINAL_API_KEY"] = settings.sandbox_api_key
+        if env:
+            payload["env"] = env
+        if policy_file:
+            payload["policy_file"] = policy_file
+        if user_data_dir:
+            payload["volumes"] = [f"{user_data_dir}:/data"]
+        if gpu:
+            payload["gpu"] = True
+        raw = await _gateway_request(
+            "POST", "/v1/sandboxes", json_body=payload,
+            timeout=settings.startup_timeout,
+        )
 
-    raw = await _run_cli(*args, timeout=settings.startup_timeout)
     info = _parse_sandbox_json(raw)
     if not info.name:
         info.name = name
@@ -141,7 +250,10 @@ async def create_sandbox(
 
 async def suspend_sandbox(name: str) -> None:
     """Suspend a running sandbox via ``openshell sandbox suspend``."""
-    await _run_cli("sandbox", "suspend", name)
+    if _CLI_AVAILABLE:
+        await _run_cli("sandbox", "suspend", name)
+    else:
+        await _gateway_request("POST", f"/v1/sandboxes/{name}/suspend")
     logger.info("Suspended sandbox %s", name)
 
 
@@ -150,10 +262,16 @@ async def resume_sandbox(name: str) -> SandboxInfo:
 
     Returns updated sandbox info (IP may change after resume).
     """
-    raw = await _run_cli(
-        "sandbox", "resume", name, "--output", "json",
-        timeout=settings.resume_timeout,
-    )
+    if _CLI_AVAILABLE:
+        raw = await _run_cli(
+            "sandbox", "resume", name, "--output", "json",
+            timeout=settings.resume_timeout,
+        )
+    else:
+        raw = await _gateway_request(
+            "POST", f"/v1/sandboxes/{name}/resume",
+            timeout=settings.resume_timeout,
+        )
     info = _parse_sandbox_json(raw)
     if not info.name:
         info.name = name
@@ -163,7 +281,10 @@ async def resume_sandbox(name: str) -> SandboxInfo:
 
 async def destroy_sandbox(name: str) -> None:
     """Destroy a sandbox via ``openshell sandbox destroy``."""
-    await _run_cli("sandbox", "destroy", name, "--force")
+    if _CLI_AVAILABLE:
+        await _run_cli("sandbox", "destroy", name, "--force")
+    else:
+        await _gateway_request("DELETE", f"/v1/sandboxes/{name}?force=true")
     logger.info("Destroyed sandbox %s", name)
 
 
@@ -173,7 +294,10 @@ async def health_check(name: str) -> bool:
     Returns True if the sandbox reports a healthy/ready state.
     """
     try:
-        raw = await _run_cli("sandbox", "status", name, "--output", "json", timeout=10)
+        if _CLI_AVAILABLE:
+            raw = await _run_cli("sandbox", "status", name, "--output", "json", timeout=10)
+        else:
+            raw = await _gateway_request("GET", f"/v1/sandboxes/{name}", timeout=10)
         info = _parse_sandbox_json(raw)
         return info.state in ("READY", "ACTIVE", "RUNNING")
     except (OpenShellError, asyncio.TimeoutError):
@@ -182,7 +306,14 @@ async def health_check(name: str) -> bool:
 
 async def set_policy(name: str, policy_file: str) -> None:
     """Apply a policy to a running sandbox via ``openshell policy set``."""
-    await _run_cli("policy", "set", "--sandbox", name, "--file", policy_file)
+    if _CLI_AVAILABLE:
+        await _run_cli("policy", "set", "--sandbox", name, "--file", policy_file)
+    else:
+        policy_content = Path(policy_file).read_text()
+        await _gateway_request(
+            "PUT", f"/v1/sandboxes/{name}/policy",
+            body=policy_content, content_type="application/x-yaml",
+        )
     logger.info("Applied policy to sandbox %s", name)
 
 
@@ -191,7 +322,9 @@ async def get_policy(name: str) -> str:
 
     Returns the raw YAML string of the policy currently applied to the sandbox.
     """
-    return await _run_cli("policy", "get", "--sandbox", name, "--output", "yaml")
+    if _CLI_AVAILABLE:
+        return await _run_cli("policy", "get", "--sandbox", name, "--output", "yaml")
+    return await _gateway_request("GET", f"/v1/sandboxes/{name}/policy")
 
 
 async def dry_run_policy(name: str, policy_file: str) -> str:
@@ -199,12 +332,18 @@ async def dry_run_policy(name: str, policy_file: str) -> str:
 
     Returns JSON output describing the dry-run result (e.g. what would change).
     """
-    return await _run_cli(
-        "policy", "set",
-        "--sandbox", name,
-        "--file", policy_file,
-        "--dry-run",
-        "--output", "json",
+    if _CLI_AVAILABLE:
+        return await _run_cli(
+            "policy", "set",
+            "--sandbox", name,
+            "--file", policy_file,
+            "--dry-run",
+            "--output", "json",
+        )
+    policy_content = Path(policy_file).read_text()
+    return await _gateway_request(
+        "POST", f"/v1/sandboxes/{name}/policy/dry-run",
+        body=policy_content, content_type="application/x-yaml",
     )
 
 
@@ -313,28 +452,55 @@ async def create_sandbox_with_gpu(
     if not device_uuid:
         raise OpenShellError("No GPU devices available for allocation")
 
-    args = [
-        "sandbox", "create",
-        "--name", name,
-        "--from", image_tag,
-        "--output", "json",
-        "--gpu",
-        "--runtime", "nvidia",
-        "--env", f"NVIDIA_VISIBLE_DEVICES={device_uuid}",
-        "--env", "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
-    ]
-    if settings.sandbox_api_key:
-        args.extend(["--env", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
-    if policy_file:
-        args.extend(["--policy", policy_file])
-    if user_data_dir:
-        args.extend(["--volume", f"{user_data_dir}:/data"])
+    if _CLI_AVAILABLE:
+        args = [
+            "sandbox", "create",
+            "--name", name,
+            "--from", image_tag,
+            "--output", "json",
+            "--gpu",
+            "--runtime", "nvidia",
+            "--env", f"NVIDIA_VISIBLE_DEVICES={device_uuid}",
+            "--env", "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
+        ]
+        if settings.sandbox_api_key:
+            args.extend(["--env", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
+        if policy_file:
+            args.extend(["--policy", policy_file])
+        if user_data_dir:
+            args.extend(["--volume", f"{user_data_dir}:/data"])
 
-    try:
-        raw = await _run_cli(*args, timeout=settings.startup_timeout)
-    except (OpenShellError, asyncio.TimeoutError):
-        gpu_scheduler.release(name)
-        raise
+        try:
+            raw = await _run_cli(*args, timeout=settings.startup_timeout)
+        except (OpenShellError, asyncio.TimeoutError):
+            gpu_scheduler.release(name)
+            raise
+    else:
+        payload: dict = {
+            "name": name,
+            "image": image_tag,
+            "gpu": True,
+            "runtime": "nvidia",
+            "env": {
+                "NVIDIA_VISIBLE_DEVICES": device_uuid,
+                "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+            },
+        }
+        if settings.sandbox_api_key:
+            payload["env"]["OPEN_TERMINAL_API_KEY"] = settings.sandbox_api_key
+        if policy_file:
+            payload["policy_file"] = policy_file
+        if user_data_dir:
+            payload["volumes"] = [f"{user_data_dir}:/data"]
+
+        try:
+            raw = await _gateway_request(
+                "POST", "/v1/sandboxes", json_body=payload,
+                timeout=settings.startup_timeout,
+            )
+        except (OpenShellError, asyncio.TimeoutError):
+            gpu_scheduler.release(name)
+            raise
 
     info = _parse_sandbox_json(raw)
     if not info.name:
@@ -349,11 +515,17 @@ async def create_provider(
     credentials: dict[str, str],
 ) -> None:
     """Inject credentials into a sandbox via ``openshell provider create``."""
-    creds_json = json.dumps(credentials)
-    await _run_cli(
-        "provider", "create",
-        "--sandbox", sandbox_name,
-        "--type", provider_type,
-        "--credentials", creds_json,
-    )
+    if _CLI_AVAILABLE:
+        creds_json = json.dumps(credentials)
+        await _run_cli(
+            "provider", "create",
+            "--sandbox", sandbox_name,
+            "--type", provider_type,
+            "--credentials", creds_json,
+        )
+    else:
+        await _gateway_request(
+            "POST", f"/v1/sandboxes/{sandbox_name}/providers",
+            json_body={"type": provider_type, "credentials": credentials},
+        )
     logger.info("Created provider '%s' on sandbox %s", provider_type, sandbox_name)
