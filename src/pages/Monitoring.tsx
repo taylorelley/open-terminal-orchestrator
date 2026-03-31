@@ -26,7 +26,7 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { supabase } from '../lib/supabase';
+import { getSandboxes } from '../lib/dataService';
 import { Tabs } from '../components/ui/Tabs';
 import { LoadingState, EmptyState } from '../components/ui/EmptyState';
 import { formatBytes } from '../lib/utils';
@@ -83,12 +83,8 @@ export default function Monitoring() {
   });
 
   const fetchData = useCallback(async () => {
-    const { data } = await supabase
-      .from('sandboxes')
-      .select('*, user:users(*), policy:policies(*)')
-      .in('state', ['ACTIVE', 'READY'])
-      .order('cpu_usage', { ascending: false });
-    setSandboxes((data || []) as Sandbox[]);
+    const result = await getSandboxes({ stateIn: ['ACTIVE', 'READY'], orderBy: 'cpu_usage', ascending: false });
+    setSandboxes(result.data || []);
     setLoading(false);
   }, []);
 

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import check_db_connection, engine, get_db
+from app.database import check_db_connection, engine, get_db, init_db
 from app.logging import setup_logging
 from app.middleware import PrometheusMiddleware, RequestIDMiddleware, configure_cors
 from app.routes.health import router as health_router
@@ -40,6 +40,9 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     setup_logging(settings.log_level)
     setup_telemetry()
     logger.info("Open Terminal Orchestrator starting", extra={"port": settings.port})
+
+    # Auto-create tables when using SQLite (no-op for PostgreSQL).
+    await init_db()
 
     db_ok = await check_db_connection()
     if db_ok:

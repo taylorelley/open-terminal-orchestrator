@@ -1,18 +1,29 @@
-"""OIDC authentication routes for admin SSO.
+"""Authentication routes for admin SSO and local (SQLite) auth.
 
-Provides login redirect, callback, logout, and session info endpoints.
+Provides OIDC login redirect, callback, logout, session info endpoints,
+and local email/password authentication for environments without Supabase.
 These endpoints do NOT require the ``require_admin`` dependency since
 they are part of the authentication flow itself.
 """
 
+import hashlib
+import hmac
+import json
 import logging
+import secrets
+import time
+import uuid
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.models import AdminUser
 from app.services.audit_service import log_admin
 from app.services.oidc import oidc_client
 
@@ -193,3 +204,150 @@ async def oidc_logout(
     })
     response.delete_cookie(_SESSION_COOKIE)
     return response
+
+
+# ---------------------------------------------------------------------------
+# Local (SQLite) authentication helpers & endpoints
+# ---------------------------------------------------------------------------
+
+# Signing key for local JWTs — derived from the OIDC session secret or
+# a random value generated at startup.
+_LOCAL_SECRET = settings.oidc_session_secret or secrets.token_hex(32)
+
+# Token lifetime: 8 hours.
+_LOCAL_TOKEN_TTL = 8 * 3600
+
+
+def _hash_password(password: str) -> str:
+    """Return a salted SHA-256 hash of *password*."""
+    salt = secrets.token_hex(16)
+    digest = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    return f"{salt}:{digest}"
+
+
+def _verify_password(password: str, stored: str) -> bool:
+    """Check *password* against a hash produced by ``_hash_password``."""
+    salt, digest = stored.split(":", 1)
+    expected = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    return hmac.compare_digest(digest, expected)
+
+
+def _create_local_token(user_id: str, email: str) -> str:
+    """Create a simple HMAC-signed JWT-like token for local auth."""
+    header = urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').rstrip(b"=").decode()
+    payload_data = {
+        "sub": user_id,
+        "email": email,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + _LOCAL_TOKEN_TTL,
+    }
+    payload = urlsafe_b64encode(json.dumps(payload_data).encode()).rstrip(b"=").decode()
+    signature_input = f"{header}.{payload}".encode()
+    sig = hmac.new(_LOCAL_SECRET.encode(), signature_input, hashlib.sha256).hexdigest()
+    return f"{header}.{payload}.{sig}"
+
+
+def _verify_local_token(token: str) -> dict | None:
+    """Verify a local auth token.  Returns the payload dict or None."""
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    header, payload, sig = parts
+    expected_sig = hmac.new(
+        _LOCAL_SECRET.encode(), f"{header}.{payload}".encode(), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected_sig):
+        return None
+    # Pad base64 back.
+    padded = payload + "=" * (-len(payload) % 4)
+    try:
+        data = json.loads(urlsafe_b64decode(padded))
+    except Exception:
+        return None
+    if data.get("exp", 0) < time.time():
+        return None
+    return data
+
+
+@router.post("/local/signup")
+async def local_signup(request: Request, db: AsyncSession = Depends(get_db)) -> JSONResponse:
+    """Register a local admin user (only when no admin users exist yet)."""
+    body = await request.json()
+    email = body.get("email", "").strip()
+    password = body.get("password", "")
+
+    if not email or not password:
+        return JSONResponse({"error": "Email and password are required"}, status_code=400)
+
+    # Only allow signup when no admin users exist.
+    existing = (await db.execute(select(AdminUser).limit(1))).scalars().first()
+    if existing is not None:
+        return JSONResponse(
+            {"error": "An admin user already exists. Use login instead."}, status_code=409
+        )
+
+    user = AdminUser(
+        id=uuid.uuid4(),
+        email=email,
+        password_hash=_hash_password(password),
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(user)
+    await db.flush()
+
+    ip = _source_ip(request)
+    log_admin(db, "local_signup", details={"email": email}, source_ip=ip)
+
+    token = _create_local_token(str(user.id), email)
+    return JSONResponse({"token": token, "user": {"id": str(user.id), "email": email}})
+
+
+@router.post("/local/login")
+async def local_login(request: Request, db: AsyncSession = Depends(get_db)) -> JSONResponse:
+    """Authenticate with a local admin email/password."""
+    body = await request.json()
+    email = body.get("email", "").strip()
+    password = body.get("password", "")
+
+    if not email or not password:
+        return JSONResponse({"error": "Email and password are required"}, status_code=400)
+
+    user = (
+        await db.execute(select(AdminUser).where(AdminUser.email == email))
+    ).scalars().first()
+
+    if user is None or not _verify_password(password, user.password_hash):
+        ip = _source_ip(request)
+        log_admin(db, "local_login_failed", details={"email": email}, source_ip=ip)
+        return JSONResponse({"error": "Invalid email or password"}, status_code=401)
+
+    ip = _source_ip(request)
+    log_admin(db, "local_login_success", details={"email": email}, source_ip=ip)
+
+    token = _create_local_token(str(user.id), email)
+    return JSONResponse({"token": token, "user": {"id": str(user.id), "email": email}})
+
+
+@router.get("/local/session")
+async def local_session(request: Request) -> JSONResponse:
+    """Validate a local auth token and return user info."""
+    auth_header = request.headers.get("Authorization", "")
+    token = ""
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+
+    if not token:
+        return JSONResponse({"authenticated": False, "method": None})
+
+    payload = _verify_local_token(token)
+    if not payload:
+        return JSONResponse({"authenticated": False, "method": None})
+
+    return JSONResponse({
+        "authenticated": True,
+        "method": "local",
+        "sub": payload["sub"],
+        "email": payload["email"],
+        "name": payload.get("email", ""),
+        "groups": [],
+    })

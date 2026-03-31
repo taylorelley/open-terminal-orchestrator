@@ -1,6 +1,15 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, isLocalMode } from '../lib/supabase';
+import {
+  localSignIn,
+  localSignUp,
+  localSession,
+  authConfig,
+  getLocalToken,
+  setLocalToken,
+  clearLocalToken,
+} from '../lib/api';
 
 interface OIDCSession {
   sub: string;
@@ -32,9 +41,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authMethod, setAuthMethod] = useState<'local' | 'oidc' | 'both'>('local');
   const [oidcConfigured, setOidcConfigured] = useState(false);
 
+  // Local-mode synthetic user object used to satisfy `isAuthenticated`.
+  const [localUser, setLocalUser] = useState<{ id: string; email: string } | null>(null);
+
   useEffect(() => {
-    // Check both Supabase auth and OIDC session in parallel.
     const checkAuth = async () => {
+      if (isLocalMode) {
+        // ---- Local mode: validate stored token via backend ----
+        const token = getLocalToken();
+        if (token) {
+          try {
+            const info = await localSession();
+            if (info.authenticated) {
+              setLocalUser({ id: info.sub!, email: info.email! });
+            } else {
+              clearLocalToken();
+            }
+          } catch {
+            clearLocalToken();
+          }
+        }
+
+        // Fetch auth config from backend (may provide OIDC info even in local mode).
+        try {
+          const cfg = await authConfig();
+          setAuthMethod(cfg.auth_method as 'local' | 'oidc' | 'both');
+          setOidcConfigured(cfg.oidc_configured);
+        } catch {
+          // Backend might be unreachable; keep defaults.
+        }
+
+        setLoading(false);
+        return;
+      }
+
+      // ---- Supabase mode ----
       const [supabaseResult, authConfigResult, oidcSessionResult] = await Promise.allSettled([
         supabase.auth.getSession(),
         fetch('/admin/api/auth/config').then(r => r.ok ? r.json() : null),
@@ -64,19 +105,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-    });
-
-    return () => subscription.unsubscribe();
+    if (!isLocalMode) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+        setSession(s);
+      });
+      return () => subscription.unsubscribe();
+    }
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    if (isLocalMode) {
+      try {
+        const res = await localSignIn(email, password);
+        setLocalToken(res.token);
+        setLocalUser(res.user);
+        return { error: null };
+      } catch (e) {
+        return { error: e as Error };
+      }
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error as Error | null };
   };
 
   const signUp = async (email: string, password: string) => {
+    if (isLocalMode) {
+      try {
+        const res = await localSignUp(email, password);
+        setLocalToken(res.token);
+        setLocalUser(res.user);
+        return { error: null };
+      } catch (e) {
+        return { error: e as Error };
+      }
+    }
     const { error } = await supabase.auth.signUp({ email, password });
     return { error: error as Error | null };
   };
@@ -86,6 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (isLocalMode) {
+      clearLocalToken();
+      setLocalUser(null);
+      return;
+    }
+
     // Sign out of both Supabase and OIDC.
     if (oidcSession) {
       try {
@@ -103,13 +171,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  const isAuthenticated = !!(session?.user || oidcSession);
+  const isAuthenticated = !!(session?.user || oidcSession || localUser);
 
   return (
     <AuthContext.Provider
       value={{
         session,
-        user: session?.user ?? null,
+        user: session?.user ?? (localUser ? { id: localUser.id, email: localUser.email } as unknown as User : null),
         oidcSession,
         loading,
         authMethod,

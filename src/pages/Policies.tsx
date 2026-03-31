@@ -16,7 +16,7 @@ import {
   CheckCircle,
   GripVertical,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import * as ds from '../lib/dataService';
 import { Tabs } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
@@ -49,15 +49,15 @@ export default function Policies() {
 
   const fetchData = useCallback(async () => {
     const [polRes, assignRes, usersRes, groupsRes] = await Promise.all([
-      supabase.from('policies').select('*').order('created_at', { ascending: true }),
-      supabase.from('policy_assignments').select('*, policy:policies(*)').order('priority', { ascending: false }),
-      supabase.from('users').select('*, group:groups(*)').order('username'),
-      supabase.from('groups').select('*, policy:policies(*)').order('name'),
+      ds.getPolicies(),
+      ds.getPolicyAssignments(),
+      ds.getUsers(),
+      ds.getGroups(),
     ]);
-    setPolicies((polRes.data || []) as Policy[]);
-    setAssignments((assignRes.data || []) as PolicyAssignment[]);
-    setUsers((usersRes.data || []) as User[]);
-    setGroups((groupsRes.data || []) as Group[]);
+    setPolicies(polRes.data || []);
+    setAssignments(assignRes.data || []);
+    setUsers(usersRes.data || []);
+    setGroups(groupsRes.data || []);
     setLoading(false);
   }, []);
 
@@ -91,12 +91,8 @@ export default function Policies() {
   }, [editorYaml, editingPolicy]);
 
   const fetchVersions = async (policyId: string) => {
-    const { data } = await supabase
-      .from('policy_versions')
-      .select('*')
-      .eq('policy_id', policyId)
-      .order('created_at', { ascending: false });
-    setVersions((data || []) as PolicyVersion[]);
+    const result = await ds.getPolicyVersions(policyId);
+    setVersions(result.data || []);
   };
 
   const handleEdit = (policy: Policy) => {
@@ -115,18 +111,18 @@ export default function Policies() {
     const patch = parts[2] || '0';
     const newVersion = `${major}.${minor + 1}.${patch}`;
 
-    await supabase.from('policy_versions').insert({
+    await ds.createPolicyVersion({
       policy_id: editingPolicy.id,
       version: editingPolicy.current_version,
       yaml: editingPolicy.yaml,
       changelog: editorChangelog || 'No changelog provided',
     });
 
-    await supabase.from('policies').update({
+    await ds.updatePolicy(editingPolicy.id, {
       yaml: editorYaml,
       current_version: newVersion,
       updated_at: new Date().toISOString(),
-    }).eq('id', editingPolicy.id);
+    });
 
     setEditingPolicy(null);
     setActiveTab('library');
@@ -135,7 +131,7 @@ export default function Policies() {
 
   const handleClone = async (policy: Policy) => {
     const newName = `${policy.name}-copy`;
-    await supabase.from('policies').insert({
+    await ds.createPolicy({
       name: newName,
       tier: policy.tier,
       description: `Copy of ${policy.name}`,
@@ -148,7 +144,7 @@ export default function Policies() {
   const handleDelete = async (policy: Policy) => {
     const usedBy = assignments.filter((a) => a.policy_id === policy.id);
     if (usedBy.length > 0) return;
-    await supabase.from('policies').delete().eq('id', policy.id);
+    await ds.deletePolicy(policy.id);
     setDeleteConfirm(null);
     fetchData();
   };
@@ -156,10 +152,10 @@ export default function Policies() {
   const handleAssignmentChange = async (entityType: string, entityId: string, policyId: string) => {
     const existing = assignments.find((a) => a.entity_type === entityType && a.entity_id === entityId);
     if (existing) {
-      await supabase.from('policy_assignments').update({ policy_id: policyId }).eq('id', existing.id);
+      await ds.upsertPolicyAssignment({ id: existing.id, policy_id: policyId });
     } else {
-      await supabase.from('policy_assignments').insert({
-        entity_type: entityType,
+      await ds.upsertPolicyAssignment({
+        entity_type: entityType as 'user' | 'group' | 'role',
         entity_id: entityId,
         policy_id: policyId,
         priority: entityType === 'user' ? 30 : entityType === 'group' ? 20 : 10,
@@ -315,9 +311,9 @@ export default function Policies() {
                   const nameMatch = editorYaml.match(/name:\s*(\S+)/);
                   const tierMatch = editorYaml.match(/tier:\s*(\S+)/);
                   const descMatch = editorYaml.match(/description:\s*"?([^"\n]+)"?/);
-                  await supabase.from('policies').insert({
+                  await ds.createPolicy({
                     name: nameMatch?.[1] || 'new-policy',
-                    tier: tierMatch?.[1] || 'restricted',
+                    tier: (tierMatch?.[1] || 'restricted') as Policy['tier'],
                     description: descMatch?.[1] || '',
                     current_version: '1.0.0',
                     yaml: editorYaml,

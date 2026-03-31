@@ -14,7 +14,7 @@ import {
   Terminal,
   X,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import * as ds from '../lib/dataService';
 import { Tabs } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { SlidePanel } from '../components/ui/SlidePanel';
@@ -37,12 +37,8 @@ export default function Sandboxes() {
   const [terminalOpen, setTerminalOpen] = useState(false);
 
   const fetchSandboxes = useCallback(async () => {
-    const { data } = await supabase
-      .from('sandboxes')
-      .select('*, user:users(*), policy:policies(*)')
-      .neq('state', 'DESTROYED')
-      .order('last_active_at', { ascending: false });
-    setSandboxes((data || []) as Sandbox[]);
+    const result = await ds.getSandboxes({ excludeState: 'DESTROYED', orderBy: 'last_active_at', ascending: false });
+    setSandboxes(result.data || []);
     setLoading(false);
   }, []);
 
@@ -51,13 +47,8 @@ export default function Sandboxes() {
   }, [fetchSandboxes]);
 
   const fetchSandboxLogs = async (sandboxId: string) => {
-    const { data } = await supabase
-      .from('audit_log')
-      .select('*, user:users(*)')
-      .eq('sandbox_id', sandboxId)
-      .order('timestamp', { ascending: false })
-      .limit(20);
-    setSandboxLogs((data || []) as AuditLogEntry[]);
+    const result = await ds.getSandboxLogs(sandboxId, 20);
+    setSandboxLogs(result.data || []);
   };
 
   const handleSelectSandbox = (sb: Sandbox) => {
@@ -68,20 +59,11 @@ export default function Sandboxes() {
 
   const handleAction = async (sandbox: Sandbox, action: string) => {
     if (action === 'suspend') {
-      await supabase
-        .from('sandboxes')
-        .update({ state: 'SUSPENDED', suspended_at: new Date().toISOString(), cpu_usage: 0, memory_usage: 0, network_io: 0 })
-        .eq('id', sandbox.id);
+      await ds.suspendSandbox(sandbox.id);
     } else if (action === 'resume') {
-      await supabase
-        .from('sandboxes')
-        .update({ state: 'ACTIVE', suspended_at: null, last_active_at: new Date().toISOString() })
-        .eq('id', sandbox.id);
+      await ds.resumeSandbox(sandbox.id);
     } else if (action === 'destroy') {
-      await supabase
-        .from('sandboxes')
-        .update({ state: 'DESTROYED', destroyed_at: new Date().toISOString() })
-        .eq('id', sandbox.id);
+      await ds.destroySandbox(sandbox.id);
     }
     setConfirmAction(null);
     setSelectedSandbox(null);

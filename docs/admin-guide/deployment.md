@@ -9,6 +9,10 @@ This document covers deploying Open Terminal Orchestrator using Docker Compose f
 - An Open WebUI instance to integrate with
 - (Production) A K3s cluster with `kubectl` configured
 
+## SQLite Local Mode
+
+For evaluation, demos, or development without external dependencies, set `DATABASE_URL=sqlite:///./oto.db` in your `.env` file and omit `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`. Tables are auto-created on first startup and authentication uses local email/password with JWT tokens. No PostgreSQL, Supabase, or Docker required.
+
 ## Docker Compose Quick Start
 
 The provided `docker-compose.yml` starts Open Terminal Orchestrator and its PostgreSQL database.

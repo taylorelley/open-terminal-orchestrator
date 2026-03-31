@@ -79,10 +79,17 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def convert_database_url(cls, v: str) -> str:
-        """Ensure the URL uses the asyncpg driver prefix."""
+        """Ensure the URL uses the correct async driver prefix."""
         if v.startswith("postgresql://"):
             return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if v.startswith("sqlite://"):
+            return v.replace("sqlite://", "sqlite+aiosqlite://", 1)
         return v
+
+    @property
+    def is_sqlite(self) -> bool:
+        """Return True when the configured database is SQLite."""
+        return self.database_url.startswith("sqlite")
 
 
 settings = Settings()
