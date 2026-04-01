@@ -12,6 +12,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://oto:${SG_DB_PASS:-oto}@oto-db:5432/oto
       - OPENSHELL_GATEWAY=${OPENSHELL_GATEWAY:-http://openshell-gateway:6443}
+      - SANDBOX_NETWORK=${SANDBOX_NETWORK:-oto-internal}
       - OPEN_WEBUI_BASE_URL=${OPEN_WEBUI_BASE_URL:-http://open-webui:8080}
       - OPEN_WEBUI_API_KEY=${OPEN_WEBUI_API_KEY:-}
       - ADMIN_API_KEY=${ADMIN_API_KEY:-}
@@ -55,3 +56,4 @@ volumes:
 
 networks:
   oto-internal:
+    name: oto-internal

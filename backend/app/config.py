@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # User data volumes
     user_data_base_dir: str = "/var/lib/oto/user-data"
 
+    # Docker network for sandbox containers (must match the network the OTO
+    # container is attached to so it can reach sandboxes by IP).
+    sandbox_network: str = "oto-internal"
+
     # Pool defaults (overridden by system_config rows at runtime)
     pool_warmup_size: int = 2
     pool_max_sandboxes: int = 20
