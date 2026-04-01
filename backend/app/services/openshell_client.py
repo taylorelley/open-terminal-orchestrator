@@ -1,8 +1,9 @@
-"""Async wrapper around the ``openshell`` CLI for sandbox lifecycle operations.
+"""Sandbox lifecycle management via the Docker CLI.
 
-Provides non-blocking subprocess calls to create, suspend, resume, destroy, and
-health-check sandboxes via the ``openshell`` binary.  Falls back to HTTP calls
-to the OpenShell gateway when the CLI is not available.
+Creates, suspends, resumes, destroys, and health-checks sandbox containers
+using ``docker`` commands over the mounted Docker socket.  Falls back to HTTP
+calls to the OpenShell gateway (``settings.openshell_gateway``) when Docker is
+not available.
 """
 
 import asyncio
@@ -19,30 +20,31 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Default timeout for CLI subprocess calls (seconds).
+# Default timeout for subprocess / HTTP calls (seconds).
 _CLI_TIMEOUT = 60
 
-# Detect whether the openshell CLI binary is on PATH.
-_CLI_AVAILABLE = shutil.which("openshell") is not None
+# Detect available transport at import time.
+_DOCKER_AVAILABLE = shutil.which("docker") is not None
 
-# Module-level HTTP client for gateway communication (initialised at startup).
+# Module-level HTTP client for gateway fallback (initialised at startup).
 _gateway_client: httpx.AsyncClient | None = None
 
 
 async def init_gateway_client() -> None:
-    """Create the HTTP client for the OpenShell gateway (when CLI is unavailable)."""
+    """Create the HTTP client for the OpenShell gateway (when Docker is unavailable)."""
     global _gateway_client  # noqa: PLW0603
-    if not _CLI_AVAILABLE:
+    if _DOCKER_AVAILABLE:
+        logger.info("Docker CLI found on PATH — using Docker transport for sandboxes")
+    else:
         _gateway_client = httpx.AsyncClient(
             base_url=settings.openshell_gateway,
             timeout=httpx.Timeout(_CLI_TIMEOUT, connect=5.0),
         )
         logger.info(
-            "OpenShell gateway HTTP client initialised (base_url=%s)",
+            "Docker CLI not found; falling back to OpenShell gateway HTTP client "
+            "(base_url=%s)",
             settings.openshell_gateway,
         )
-    else:
-        logger.info("OpenShell CLI found on PATH — using subprocess transport")
 
 
 async def close_gateway_client() -> None:
@@ -55,7 +57,7 @@ async def close_gateway_client() -> None:
 
 @dataclass
 class SandboxInfo:
-    """Parsed result from an openshell sandbox operation."""
+    """Parsed result from a sandbox operation."""
 
     name: str
     internal_ip: str
@@ -64,7 +66,7 @@ class SandboxInfo:
 
 
 class OpenShellError(Exception):
-    """Raised when an openshell CLI command fails."""
+    """Raised when a sandbox operation fails."""
 
     def __init__(self, message: str, returncode: int = 1) -> None:
         super().__init__(message)
@@ -72,25 +74,24 @@ class OpenShellError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Transport: CLI subprocess
+# Transport: Docker CLI
 # ---------------------------------------------------------------------------
 
 
-async def _run_cli(
+async def _run_cmd(
     *args: str,
     timeout: float = _CLI_TIMEOUT,
 ) -> str:
-    """Run an openshell CLI command and return its stdout.
+    """Run a command and return its stdout.
 
     Raises:
         OpenShellError: If the command exits with a non-zero status.
         asyncio.TimeoutError: If the command exceeds *timeout* seconds.
     """
-    cmd = ["openshell", *args]
-    logger.debug("Running: %s", " ".join(cmd))
+    logger.debug("Running: %s", " ".join(args))
 
     proc = await asyncio.create_subprocess_exec(
-        *cmd,
+        *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -107,21 +108,59 @@ async def _run_cli(
 
     if proc.returncode != 0:
         logger.error(
-            "openshell %s failed (rc=%d): %s",
-            args[0] if args else "?",
+            "Command %s failed (rc=%d): %s",
+            args[:3],
             proc.returncode,
             stderr_str or stdout_str,
         )
         raise OpenShellError(
-            stderr_str or stdout_str or f"openshell exited with code {proc.returncode}",
+            stderr_str or stdout_str or f"Command exited with code {proc.returncode}",
             returncode=proc.returncode or 1,
         )
 
     return stdout_str
 
 
+async def _docker_inspect_ip(name: str) -> str:
+    """Return the container IP on the sandbox network."""
+    network = settings.sandbox_network
+    fmt = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"
+    # Try network-specific first, fall back to any network.
+    try:
+        net_fmt = f"{{{{.NetworkSettings.Networks.{network}.IPAddress}}}}"
+        return await _run_cmd("docker", "inspect", "-f", net_fmt, name, timeout=10)
+    except OpenShellError:
+        return await _run_cmd("docker", "inspect", "-f", fmt, name, timeout=10)
+
+
+async def _docker_wait_healthy(name: str, timeout: float) -> None:
+    """Poll until the container reports healthy or timeout expires."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            status = await _run_cmd(
+                "docker", "inspect", "-f", "{{.State.Health.Status}}", name,
+                timeout=5,
+            )
+            if status == "healthy":
+                return
+        except OpenShellError:
+            pass
+        await asyncio.sleep(2)
+    # Accept running containers that don't have a health check configured.
+    try:
+        state = await _run_cmd(
+            "docker", "inspect", "-f", "{{.State.Status}}", name, timeout=5,
+        )
+        if state == "running":
+            return
+    except OpenShellError:
+        pass
+    raise asyncio.TimeoutError()
+
+
 # ---------------------------------------------------------------------------
-# Transport: HTTP gateway
+# Transport: HTTP gateway (fallback)
 # ---------------------------------------------------------------------------
 
 
@@ -173,11 +212,10 @@ async def _gateway_request(
 
 
 def _parse_sandbox_json(raw: str) -> SandboxInfo:
-    """Parse JSON output from openshell sandbox commands."""
+    """Parse JSON output from sandbox commands."""
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        # Fallback: try to extract from non-JSON output.
         return SandboxInfo(name="", internal_ip="", state="UNKNOWN")
 
     return SandboxInfo(
@@ -200,29 +238,39 @@ async def create_sandbox(
     user_data_dir: str | None = None,
     gpu: bool = False,
 ) -> SandboxInfo:
-    """Create a new sandbox via ``openshell sandbox create``.
+    """Create a new sandbox container.
 
     Returns parsed sandbox info including the assigned internal IP.
     """
     if name is None:
         name = f"sg-pool-{uuid.uuid4().hex[:8]}"
 
-    if _CLI_AVAILABLE:
+    if _DOCKER_AVAILABLE:
         args = [
-            "sandbox", "create",
+            "docker", "run", "-d",
             "--name", name,
-            "--from", image_tag,
-            "--output", "json",
+            "--network", settings.sandbox_network,
+            "--restart", "no",
         ]
         if settings.sandbox_api_key:
-            args.extend(["--env", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
+            args.extend(["-e", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
         if policy_file:
-            args.extend(["--policy", policy_file])
+            args.extend(["-e", f"OPEN_TERMINAL_POLICY_FILE={policy_file}"])
         if user_data_dir:
-            args.extend(["--volume", f"{user_data_dir}:/data"])
+            args.extend(["-v", f"{user_data_dir}:/data"])
         if gpu:
-            args.append("--gpu")
-        raw = await _run_cli(*args, timeout=settings.startup_timeout)
+            args.append("--gpus=all")
+        args.append(image_tag)
+        await _run_cmd(*args, timeout=settings.startup_timeout)
+
+        # Wait for the container to become healthy, then retrieve its IP.
+        try:
+            await _docker_wait_healthy(name, timeout=settings.startup_timeout)
+        except asyncio.TimeoutError:
+            logger.warning("Sandbox %s did not become healthy in time", name)
+
+        ip = await _docker_inspect_ip(name)
+        info = SandboxInfo(name=name, internal_ip=ip, state="READY", image_tag=image_tag)
     else:
         payload: dict = {"name": name, "image": image_tag}
         env: dict[str, str] = {}
@@ -240,8 +288,8 @@ async def create_sandbox(
             "POST", "/v1/sandboxes", json_body=payload,
             timeout=settings.startup_timeout,
         )
+        info = _parse_sandbox_json(raw)
 
-    info = _parse_sandbox_json(raw)
     if not info.name:
         info.name = name
     logger.info("Created sandbox %s (ip=%s)", info.name, info.internal_ip)
@@ -249,30 +297,33 @@ async def create_sandbox(
 
 
 async def suspend_sandbox(name: str) -> None:
-    """Suspend a running sandbox via ``openshell sandbox suspend``."""
-    if _CLI_AVAILABLE:
-        await _run_cli("sandbox", "suspend", name)
+    """Stop (suspend) a running sandbox container."""
+    if _DOCKER_AVAILABLE:
+        await _run_cmd("docker", "stop", name)
     else:
         await _gateway_request("POST", f"/v1/sandboxes/{name}/suspend")
     logger.info("Suspended sandbox %s", name)
 
 
 async def resume_sandbox(name: str) -> SandboxInfo:
-    """Resume a suspended sandbox via ``openshell sandbox resume``.
+    """Start (resume) a stopped sandbox container.
 
     Returns updated sandbox info (IP may change after resume).
     """
-    if _CLI_AVAILABLE:
-        raw = await _run_cli(
-            "sandbox", "resume", name, "--output", "json",
-            timeout=settings.resume_timeout,
-        )
+    if _DOCKER_AVAILABLE:
+        await _run_cmd("docker", "start", name, timeout=settings.resume_timeout)
+        try:
+            await _docker_wait_healthy(name, timeout=settings.resume_timeout)
+        except asyncio.TimeoutError:
+            logger.warning("Sandbox %s did not become healthy after resume", name)
+        ip = await _docker_inspect_ip(name)
+        info = SandboxInfo(name=name, internal_ip=ip, state="READY")
     else:
         raw = await _gateway_request(
             "POST", f"/v1/sandboxes/{name}/resume",
             timeout=settings.resume_timeout,
         )
-    info = _parse_sandbox_json(raw)
+        info = _parse_sandbox_json(raw)
     if not info.name:
         info.name = name
     logger.info("Resumed sandbox %s (ip=%s)", info.name, info.internal_ip)
@@ -280,24 +331,26 @@ async def resume_sandbox(name: str) -> SandboxInfo:
 
 
 async def destroy_sandbox(name: str) -> None:
-    """Destroy a sandbox via ``openshell sandbox destroy``."""
-    if _CLI_AVAILABLE:
-        await _run_cli("sandbox", "destroy", name, "--force")
+    """Force-remove a sandbox container."""
+    if _DOCKER_AVAILABLE:
+        await _run_cmd("docker", "rm", "-f", name)
     else:
         await _gateway_request("DELETE", f"/v1/sandboxes/{name}?force=true")
     logger.info("Destroyed sandbox %s", name)
 
 
 async def health_check(name: str) -> bool:
-    """Check if a sandbox is healthy via ``openshell sandbox status``.
+    """Check if a sandbox container is running and healthy.
 
-    Returns True if the sandbox reports a healthy/ready state.
+    Returns True if the container reports a healthy/ready state.
     """
     try:
-        if _CLI_AVAILABLE:
-            raw = await _run_cli("sandbox", "status", name, "--output", "json", timeout=10)
-        else:
-            raw = await _gateway_request("GET", f"/v1/sandboxes/{name}", timeout=10)
+        if _DOCKER_AVAILABLE:
+            state = await _run_cmd(
+                "docker", "inspect", "-f", "{{.State.Status}}", name, timeout=10,
+            )
+            return state == "running"
+        raw = await _gateway_request("GET", f"/v1/sandboxes/{name}", timeout=10)
         info = _parse_sandbox_json(raw)
         return info.state in ("READY", "ACTIVE", "RUNNING")
     except (OpenShellError, asyncio.TimeoutError):
@@ -305,9 +358,13 @@ async def health_check(name: str) -> bool:
 
 
 async def set_policy(name: str, policy_file: str) -> None:
-    """Apply a policy to a running sandbox via ``openshell policy set``."""
-    if _CLI_AVAILABLE:
-        await _run_cli("policy", "set", "--sandbox", name, "--file", policy_file)
+    """Apply a policy to a running sandbox."""
+    if _DOCKER_AVAILABLE:
+        await _run_cmd("docker", "cp", policy_file, f"{name}:/tmp/policy.yaml")
+        await _run_cmd(
+            "docker", "exec", name,
+            "open-terminal-apply-policy", "/tmp/policy.yaml",
+        )
     else:
         policy_content = Path(policy_file).read_text()
         await _gateway_request(
@@ -318,12 +375,15 @@ async def set_policy(name: str, policy_file: str) -> None:
 
 
 async def get_policy(name: str) -> str:
-    """Retrieve the active policy YAML from a sandbox via ``openshell policy get``.
+    """Retrieve the active policy YAML from a sandbox.
 
     Returns the raw YAML string of the policy currently applied to the sandbox.
     """
-    if _CLI_AVAILABLE:
-        return await _run_cli("policy", "get", "--sandbox", name, "--output", "yaml")
+    if _DOCKER_AVAILABLE:
+        return await _run_cmd(
+            "docker", "exec", name,
+            "cat", "/etc/open-terminal/policy.yaml",
+        )
     return await _gateway_request("GET", f"/v1/sandboxes/{name}/policy")
 
 
@@ -332,13 +392,12 @@ async def dry_run_policy(name: str, policy_file: str) -> str:
 
     Returns JSON output describing the dry-run result (e.g. what would change).
     """
-    if _CLI_AVAILABLE:
-        return await _run_cli(
-            "policy", "set",
-            "--sandbox", name,
-            "--file", policy_file,
-            "--dry-run",
-            "--output", "json",
+    if _DOCKER_AVAILABLE:
+        await _run_cmd("docker", "cp", policy_file, f"{name}:/tmp/policy.yaml")
+        return await _run_cmd(
+            "docker", "exec", name,
+            "open-terminal-apply-policy", "--dry-run", "--output", "json",
+            "/tmp/policy.yaml",
         )
     policy_content = Path(policy_file).read_text()
     return await _gateway_request(
@@ -441,8 +500,8 @@ async def create_sandbox_with_gpu(
 ) -> SandboxInfo:
     """Create a GPU-enabled sandbox with NVIDIA runtime configuration.
 
-    Allocates a GPU device, then calls ``openshell sandbox create`` with
-    the ``--gpu`` flag and ``--runtime nvidia`` plus device environment
+    Allocates a GPU device, then creates the container with
+    the ``--gpus`` flag and ``--runtime nvidia`` plus device environment
     variables.
     """
     if name is None:
@@ -452,26 +511,32 @@ async def create_sandbox_with_gpu(
     if not device_uuid:
         raise OpenShellError("No GPU devices available for allocation")
 
-    if _CLI_AVAILABLE:
+    if _DOCKER_AVAILABLE:
         args = [
-            "sandbox", "create",
+            "docker", "run", "-d",
             "--name", name,
-            "--from", image_tag,
-            "--output", "json",
-            "--gpu",
+            "--network", settings.sandbox_network,
+            "--restart", "no",
             "--runtime", "nvidia",
-            "--env", f"NVIDIA_VISIBLE_DEVICES={device_uuid}",
-            "--env", "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
+            "-e", f"NVIDIA_VISIBLE_DEVICES={device_uuid}",
+            "-e", "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
         ]
         if settings.sandbox_api_key:
-            args.extend(["--env", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
+            args.extend(["-e", f"OPEN_TERMINAL_API_KEY={settings.sandbox_api_key}"])
         if policy_file:
-            args.extend(["--policy", policy_file])
+            args.extend(["-e", f"OPEN_TERMINAL_POLICY_FILE={policy_file}"])
         if user_data_dir:
-            args.extend(["--volume", f"{user_data_dir}:/data"])
+            args.extend(["-v", f"{user_data_dir}:/data"])
+        args.append(image_tag)
 
         try:
-            raw = await _run_cli(*args, timeout=settings.startup_timeout)
+            await _run_cmd(*args, timeout=settings.startup_timeout)
+            try:
+                await _docker_wait_healthy(name, timeout=settings.startup_timeout)
+            except asyncio.TimeoutError:
+                logger.warning("GPU sandbox %s did not become healthy in time", name)
+            ip = await _docker_inspect_ip(name)
+            info = SandboxInfo(name=name, internal_ip=ip, state="READY", image_tag=image_tag)
         except (OpenShellError, asyncio.TimeoutError):
             gpu_scheduler.release(name)
             raise
@@ -498,11 +563,11 @@ async def create_sandbox_with_gpu(
                 "POST", "/v1/sandboxes", json_body=payload,
                 timeout=settings.startup_timeout,
             )
+            info = _parse_sandbox_json(raw)
         except (OpenShellError, asyncio.TimeoutError):
             gpu_scheduler.release(name)
             raise
 
-    info = _parse_sandbox_json(raw)
     if not info.name:
         info.name = name
     logger.info("Created GPU sandbox %s (ip=%s, gpu=%s)", info.name, info.internal_ip, device_uuid)
@@ -514,12 +579,12 @@ async def create_provider(
     provider_type: str,
     credentials: dict[str, str],
 ) -> None:
-    """Inject credentials into a sandbox via ``openshell provider create``."""
-    if _CLI_AVAILABLE:
+    """Inject credentials into a sandbox."""
+    if _DOCKER_AVAILABLE:
         creds_json = json.dumps(credentials)
-        await _run_cli(
-            "provider", "create",
-            "--sandbox", sandbox_name,
+        await _run_cmd(
+            "docker", "exec", sandbox_name,
+            "open-terminal-inject-provider",
             "--type", provider_type,
             "--credentials", creds_json,
         )

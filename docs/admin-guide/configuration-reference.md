@@ -19,7 +19,7 @@ Variables marked **required** must be set for Open Terminal Orchestrator to star
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `OPENSHELL_GATEWAY` | string | *(required)* | URL of the OpenShell gateway that manages container lifecycle operations (create, destroy, suspend, resume). Open Terminal Orchestrator sends all sandbox orchestration commands to this endpoint. |
+| `OPENSHELL_GATEWAY` | string | `http://openshell-gateway:6443` | URL of the OpenShell gateway for sandbox lifecycle operations. Used only as a fallback when the Docker CLI is not available inside the OTO container. When Docker is available (docker socket mounted), sandbox containers are managed directly via `docker run`/`stop`/`start`/`rm`. |
 | `OPEN_WEBUI_BASE_URL` | string | `""` | Base URL of the Open WebUI instance. When set, Open Terminal Orchestrator periodically syncs the user list from Open WebUI so that sandbox policies can be applied before a user's first session. |
 | `OPEN_WEBUI_API_KEY` | string | `""` | API key for authenticating with the Open WebUI admin API during user sync. Required when `OPEN_WEBUI_BASE_URL` is set. |
 | `ADMIN_API_KEY` | string | `""` | Bearer token for authenticating requests to Open Terminal Orchestrator management API endpoints (`/api/v1/admin/*`). When left empty, API-key authentication is disabled and only session-based auth is accepted. |
@@ -34,6 +34,14 @@ These variables are embedded into the frontend bundle at build time by Vite. The
 |----------|------|---------|-------------|
 | `VITE_SUPABASE_URL` | string | *(optional)* | The Supabase project URL. Used by the React frontend to initialize the Supabase client for authentication and real-time subscriptions. **When omitted**, the frontend enters "local mode" and routes all data through the backend REST API using local JWT auth. |
 | `VITE_SUPABASE_ANON_KEY` | string | *(optional)* | The Supabase anonymous (public) key. Required when `VITE_SUPABASE_URL` is set. This key is safe to expose in the browser -- Row-Level Security policies on the database enforce access control. |
+
+---
+
+## Sandbox Network
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `SANDBOX_NETWORK` | string | `oto-internal` | Docker network that sandbox containers are attached to. Must be the same network the OTO container runs on so it can reach sandboxes by IP. The default matches the network defined in the provided `docker-compose.yml`. |
 
 ---
 
